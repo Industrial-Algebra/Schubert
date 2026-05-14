@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Industrial Algebra
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Audit trail for access control decisions.
 //!
 //! The audit module provides a pluggable recording mechanism for every

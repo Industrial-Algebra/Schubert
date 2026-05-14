@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Industrial Algebra
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Capability types for geometric access control.
 //!
 //! A [`Capability`] is a named Schubert condition — a geometric constraint

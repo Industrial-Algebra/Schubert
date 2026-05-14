@@ -3,7 +3,7 @@
 **Project:** Quantitative access control via Schubert calculus
 **Location:** `/home/elliotthall/working/industrial-algebra/Schubert`
 **Date:** May 2026
-**Status:** Foundation complete (0.1.0). IA-conformant. Karpal-integrated. Ready for extension.
+**Status:** Foundation complete (0.1.0). IA-conformant. Karpal-integrated. AGPL-3.0 licensed. Ready for extension.
 
 ---
 
@@ -292,3 +292,34 @@ Schubert now conforms to Industrial Algebra ecosystem conventions:
 | `#![warn(missing_docs)]` + `#![warn(clippy::all)]` | ✅ Zero warnings |
 | Custom error type via `thiserror` | ✅ `SchubertError` (11 variants) |
 | Karpal `Proven` + `Rewrite` integration prep | ✅ Phantom types ready; Karpal dep TBD |
+
+---
+
+## Licensing
+
+Schubert is dual-licensed under:
+
+- **GNU Affero General Public License v3 (AGPL-3.0-only)** — see `LICENSE`
+- **Commercial License** — see `LICENSE-COMMERCIAL`
+
+SPDX-License-Identifier: AGPL-3.0-only
+Copyright (C) 2026 Industrial Algebra. All rights reserved.
+
+### License Headers
+All source files carry SPDX headers:
+```rust
+// Copyright (C) 2026 Industrial Algebra
+// SPDX-License-Identifier: AGPL-3.0-only
+```
+
+### Contributor License Agreement
+Contributors must sign a CLA before pull requests can be merged.
+See `CONTRIBUTING.md` for details.
+
+### Key Licensing Files
+| File | Purpose |
+|------|--------|
+| `LICENSE` | Full AGPL v3 text with Industrial Algebra copyright notice |
+| `LICENSE-COMMERCIAL` | Commercial licensing terms and contact information |
+| `CONTRIBUTING.md` | CLA requirements and contribution process |
+| `Cargo.toml` | `license = "AGPL-3.0-only"` in SPDX format |

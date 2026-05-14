@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Industrial Algebra
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Proof-carrying access control via Karpal.
 //!
 //! This module integrates [`karpal_proof`] with Schubert's geometric access

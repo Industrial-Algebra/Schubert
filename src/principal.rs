@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Industrial Algebra
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Principal types for identity and capability possession.
 //!
 //! A [`Principal`] wraps an `amari_enumerative::Namespace` — the geometric

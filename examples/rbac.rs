@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Industrial Algebra
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! RBAC example: Kubernetes-style role-based access control.
 //!
 //! Models four Kubernetes-style roles as Schubert capabilities

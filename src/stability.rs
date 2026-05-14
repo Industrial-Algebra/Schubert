@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Industrial Algebra
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Wall-crossing stability analysis.
 //!
 //! In geometric access control, capabilities have varying sensitivity to

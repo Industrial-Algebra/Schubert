@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Industrial Algebra
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Re-exports of `amari_enumerative` phantom types for compile-time verification.
 //!
 //! These zero-sized types encode mathematical properties at the type level.

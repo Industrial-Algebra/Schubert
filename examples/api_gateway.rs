@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Industrial Algebra
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! API Gateway example: OAuth scope intersection with conflict detection.
 //!
 //! Demonstrates geometrically incompatible scope combinations that

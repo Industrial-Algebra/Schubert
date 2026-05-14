@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Industrial Algebra
+// SPDX-License-Identifier: AGPL-3.0-only
+
 use crate::audit::AuditSink;
 use crate::capability::{Capability, CapabilityId};
 use crate::decision::{AccessDecision, ComputationPath};

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Industrial Algebra
+// SPDX-License-Identifier: AGPL-3.0-only
+
 //! Operadic composition of principals.
 //!
 //! Two principals can be composed when one's output capability matches

@@ -217,4 +217,20 @@ No async runtime. No network stack. No serialization. Embeddable in any Rust pro
 
 ## License
 
-MIT OR Apache-2.0
+Schubert is dual-licensed:
+
+- **GNU Affero General Public License v3 (AGPL-3.0)** — see [LICENSE](./LICENSE)
+- **Commercial License** — for proprietary use, see [LICENSE-COMMERCIAL](./LICENSE-COMMERCIAL)
+
+In summary:
+
+| Use Case | License |
+|----------|--------|
+| Open-source (AGPL-compatible) projects | AGPL v3 — free |
+| Proprietary / closed-source software | Commercial license required |
+| SaaS / hosted service (without releasing modifications) | Commercial license required |
+| Evaluation, research, personal projects | AGPL v3 — free |
+
+For commercial licensing inquiries: <license@industrial-algebra.org>
+
+Copyright © 2026 Industrial Algebra. All rights reserved.
