@@ -4,7 +4,10 @@ use crate::decision::{AccessDecision, ComputationPath};
 use crate::error::{Result, SchubertError};
 use crate::principal::{Principal, PrincipalId};
 use amari_enumerative::{IntersectionResult, SchubertCalculus};
+#[cfg(feature = "std")]
 use std::collections::HashMap;
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeMap as HashMap;
 
 /// Access controller for quantitative capability-based authorization.
 ///

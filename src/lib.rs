@@ -72,6 +72,22 @@
 //! - A network service (library only)
 //! - A replacement for OAuth/OIDC (compatible alongside them)
 //! - A key-value store or database
+//!
+//! ## Feature Flags
+//!
+//! - `std` (default) — Enables `std::collections::HashMap`, `SystemTime` timestamps,
+//!   and thread-safe audit via `Mutex`. Disable for `no_std` environments.
+//! - `serde` — Enables `Serialize`/`Deserialize` on key types for policy persistence.
+//!
+//! ## `no_std` Support
+//!
+//! Schubert targets `no_std` compatibility via the `alloc` crate. When the `std`
+//! feature is disabled:
+//!
+//! - `HashMap` is replaced with `BTreeMap` from `alloc`
+//! - `InMemoryAudit` is not thread-safe (single-threaded environments only)
+//! - `now_millis()` returns 0 (no system clock available)
+//! - Full `no_std` requires an allocator and `amari-enumerative` without `std`
 
 #![warn(missing_docs)]
 #![warn(clippy::all)]
@@ -84,6 +100,8 @@ pub mod controller;
 /// Access decision types — the quantitative result of every check.
 pub mod decision;
 pub mod error;
+/// Compile-time phantom type markers from amari-enumerative.
+pub mod phantom;
 pub mod principal;
 pub mod stability;
 

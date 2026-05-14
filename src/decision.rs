@@ -39,6 +39,7 @@ use std::fmt;
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AccessDecision {
     /// Access granted with `configurations` valid configurations.
     Granted {
@@ -74,6 +75,7 @@ pub enum AccessDecision {
 /// Re-exported from `amari_enumerative` for convenience, but typed as our
 /// own enum so we don't leak library internals into the public API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ComputationPath {
     /// Littlewood-Richardson rule (exact, classical).
     LittlewoodRichardson,
@@ -99,7 +101,7 @@ impl fmt::Display for ComputationPath {
 impl From<amari_enumerative::IntersectionResult> for AccessDecision {
     fn from(result: IntersectionResult) -> Self {
         match result {
-            IntersectionResult::Finite(n) if n == 0 => Self::Impossible {
+            IntersectionResult::Finite(0) => Self::Impossible {
                 conflicting: Vec::new(),
             },
             IntersectionResult::Finite(n) => Self::Granted {

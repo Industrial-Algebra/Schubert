@@ -33,6 +33,7 @@ use std::fmt;
 /// two capabilities with the same ID are considered equal regardless
 /// of partition, kind, or metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CapabilityId(pub String);
 
 impl CapabilityId {
@@ -55,6 +56,7 @@ impl From<String> for CapabilityId { fn from(s: String) -> Self { Self(s) } }
 /// does not affect the mathematical computation — it's metadata for
 /// policy authors and auditing tools.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum CapabilityKind {
     /// Read-like capability. Typically codimension 1 (σ₁).
     ReadLike,
@@ -84,6 +86,7 @@ pub enum CapabilityKind {
 /// assert_eq!(read.codimension(), 1);
 /// ```
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Capability {
     /// Unique identifier for this capability.
     pub id: CapabilityId,

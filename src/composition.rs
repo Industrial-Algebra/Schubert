@@ -45,6 +45,7 @@ use amari_enumerative::{composition_multiplicity, ComposableNamespace};
 
 /// Result of composing two principals via a shared interface.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CompositionResult {
     /// Number of configurations for the composed access space.
     ///
@@ -109,9 +110,9 @@ pub fn compose(
     let amari_out = amari_enumerative::CapabilityId::new(output_cap);
     let amari_in = amari_enumerative::CapabilityId::new(input_cap);
     comp_a.mark_output(&amari_out)
-        .map_err(|e| SchubertError::CompositionFailed(e))?;
+        .map_err(SchubertError::CompositionFailed)?;
     comp_b.mark_input(&amari_in)
-        .map_err(|e| SchubertError::CompositionFailed(e))?;
+        .map_err(SchubertError::CompositionFailed)?;
 
     let multiplicity = composition_multiplicity(&comp_a, output_idx, &comp_b, input_idx);
 

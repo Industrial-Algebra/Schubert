@@ -1,0 +1,8 @@
+# Rust toolchain configuration for Schubert
+#
+# Following Industrial Algebra ecosystem conventions:
+# nightly channel + rustfmt + clippy components
+
+[toolchain]
+channel = "nightly"
+components = ["rustfmt", "clippy"]

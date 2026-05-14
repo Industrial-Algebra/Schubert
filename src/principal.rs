@@ -27,6 +27,7 @@ use std::fmt;
 /// An opaque string wrapper. Identity is external — map this to your
 /// authentication system's subject identifiers.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PrincipalId(pub String);
 
 impl PrincipalId {
@@ -54,14 +55,47 @@ impl From<String> for PrincipalId { fn from(s: String) -> Self { Self(s) } }
 ///
 /// Capabilities are stored in the namespace in grant order. The
 /// namespace preserves insertion order for audit and stability analysis.
+///
+/// # Serialization
+///
+/// When the `serde` feature is enabled, the `namespace` field is skipped
+/// during serialization. The namespace must be reconstructed from capability
+/// grants after deserializing the full controller state.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Principal {
     /// Unique identifier for this principal.
     pub id: PrincipalId,
     /// The namespace representing this principal's access space.
+    #[cfg_attr(feature = "serde", serde(skip))]
     pub namespace: Namespace,
     /// Unix timestamp of creation (milliseconds since epoch).
     pub created_at: u64,
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Principal {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct PrincipalData {
+            id: PrincipalId,
+            created_at: u64,
+        }
+        let data = PrincipalData::deserialize(deserializer)?;
+        // Namespace is reconstructed externally via grants after deserialization.
+        // Use a placeholder — callers must re-grant capabilities.
+        let namespace = NamespaceBuilder::new(data.id.as_str(), 2, 4)
+            .build()
+            .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+        Ok(Principal {
+            id: data.id,
+            namespace,
+            created_at: data.created_at,
+        })
+    }
 }
 
 impl Principal {
@@ -99,9 +133,10 @@ impl Principal {
 
 /// Current time in milliseconds since Unix epoch.
 ///
-/// Returns 0 on platforms without a system clock (e.g., `wasm32`).
+/// Returns 0 on platforms without a system clock (e.g., `wasm32`,
+/// or when the `std` feature is disabled).
 pub(crate) fn now_millis() -> u64 {
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
     {
         use std::time::{SystemTime, UNIX_EPOCH};
         SystemTime::now()
@@ -109,6 +144,6 @@ pub(crate) fn now_millis() -> u64 {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0)
     }
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(not(feature = "std"), target_arch = "wasm32"))]
     { 0 }
 }

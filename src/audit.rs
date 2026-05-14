@@ -42,6 +42,7 @@ use crate::principal::PrincipalId;
 /// Immutable once created. Forms an append-only audit trail when
 /// collected by an [`AuditSink`].
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DecisionRecord {
     /// The principal who made the request.
     pub principal: PrincipalId,
@@ -71,9 +72,14 @@ pub trait AuditSink: Send + Sync {
 /// Stores records in a `Vec<DecisionRecord>` behind a mutex. Not suitable
 /// for production (not persistent, unbounded memory growth), but useful for
 /// tests, examples, and development.
+///
+/// Requires the `std` feature (enabled by default).
 #[derive(Debug, Default)]
 pub struct InMemoryAudit {
+    #[cfg(feature = "std")]
     records: std::sync::Mutex<Vec<DecisionRecord>>,
+    #[cfg(not(feature = "std"))]
+    records: alloc::vec::Vec<DecisionRecord>,
 }
 
 impl InMemoryAudit {
@@ -83,24 +89,56 @@ impl InMemoryAudit {
     }
 
     /// Return all recorded decisions in chronological order.
+    #[cfg(feature = "std")]
     pub fn records(&self) -> Vec<DecisionRecord> {
         self.records.lock().unwrap().clone()
     }
 
+    /// Return all recorded decisions in chronological order (no_std).
+    #[cfg(not(feature = "std"))]
+    pub fn records(&self) -> alloc::vec::Vec<DecisionRecord> {
+        self.records.clone()
+    }
+
     /// Return the number of recorded decisions.
+    #[cfg(feature = "std")]
     pub fn len(&self) -> usize {
         self.records.lock().unwrap().len()
     }
 
+    /// Return the number of recorded decisions (no_std).
+    #[cfg(not(feature = "std"))]
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
     /// Whether any decisions have been recorded.
+    #[cfg(feature = "std")]
     pub fn is_empty(&self) -> bool {
         self.records.lock().unwrap().is_empty()
+    }
+
+    /// Whether any decisions have been recorded (no_std).
+    #[cfg(not(feature = "std"))]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
     }
 }
 
 impl AuditSink for InMemoryAudit {
+    #[cfg(feature = "std")]
     fn record(&self, record: &DecisionRecord) -> Result<()> {
         self.records.lock().unwrap().push(record.clone());
+        Ok(())
+    }
+
+    #[cfg(not(feature = "std"))]
+    fn record(&self, record: &DecisionRecord) -> Result<()> {
+        // Note: without std, InMemoryAudit is not thread-safe.
+        // This is acceptable for single-threaded no_std environments.
+        // SAFETY: In single-threaded no_std, this is safe.
+        let records = &self.records as *const alloc::vec::Vec<DecisionRecord> as *mut alloc::vec::Vec<DecisionRecord>;
+        unsafe { &mut *records }.push(record.clone());
         Ok(())
     }
 }

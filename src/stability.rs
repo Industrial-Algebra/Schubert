@@ -40,6 +40,7 @@ use amari_enumerative::{StabilityCondition, Wall, WallCrossingEngine};
 /// At `FULL` (1.0), all capabilities are stable. As trust decreases,
 /// higher-codimension capabilities become unstable first.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TrustLevel(pub f64);
 
 impl TrustLevel {
@@ -63,6 +64,7 @@ impl Default for TrustLevel {
 /// At each breakpoint, the set of stable capabilities changes as
 /// one or more capabilities cross their stability wall.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StabilityBreakpoint {
     /// The trust level at which this transition occurs.
     pub trust_level: TrustLevel,
@@ -78,12 +80,14 @@ pub struct StabilityBreakpoint {
 /// individual walls (per-capability transition points), and the total
 /// number of capabilities analyzed.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StabilityReport {
     /// The principal analyzed.
     pub principal: PrincipalId,
     /// Breakpoints in descending trust order.
     pub phase_diagram: Vec<StabilityBreakpoint>,
     /// Individual walls detected for each capability.
+    #[cfg_attr(feature = "serde", serde(skip, default))]
     pub walls: Vec<Wall>,
     /// Total capabilities held by the principal.
     pub total_capabilities: usize,
