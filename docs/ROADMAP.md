@@ -1,14 +1,23 @@
 # Schubert — Directions
 
-**Version:** 0.1.0 — Foundation complete. Speculative directions below.
+**Version:** 0.1.0 — Foundation complete. IA-conformant. Licensed.
+**Gitflow:** `main` (releases) ← `develop` (integration) ← `feature/*` (work)
 
 ---
 
 ## Current State
 
-Schubert provides a practical access control library built on Schubert calculus. It is embeddable, synchronous, and depends only on `amari-enumerative`. The core API — `AccessController`, `Capability`, `Principal`, `AccessDecision`, operadic composition, stability analysis — is implemented and tested.
+Schubert provides a practical access control library built on Schubert calculus.
+It is embeddable, synchronous, and depends only on `amari-enumerative` (plus
+optional `karpal-proof`, `serde`, `rayon`). The core API is implemented and
+tested at 30 unit tests, 0 warnings.
 
-What follows are speculative directions. Some are near-term and practical. Others are research-grade and require mathematical or engineering advances. All are genuine possibilities opened by the geometric foundation.
+**Completed since foundation:**
+- ✅ IA ecosystem conformance (rust-toolchain, phantom types, no_std scaffolding)
+- ✅ `serde` feature gate (derives on 11 key types)
+- ✅ `karpal` integration (Proven, Property hierarchy, Rewrite, law checks)
+- ✅ `parallel` feature gate (check_batch, stability_batch, compose_batch via rayon)
+- ✅ AGPL-3.0 dual-licensing (commercial licenses available)
 
 ---
 
@@ -27,15 +36,12 @@ What follows are speculative directions. Some are near-term and practical. Other
 
 This would make Schubert practical for enterprise-scale Grassmannians (Gr(8,16), Gr(16,32)) where naive LR is intractable.
 
-### 2. Serialization and Persistence
+### 2. Serialization and Persistence — ✅ PARTIALLY DONE (v0.1.0)
 
-**Current:** In-memory only. Principals and capabilities are transient.
+**Current:** `serde` feature gate added. Derives on all key types. `Principal.namespace`
+and `StabilityReport.walls` are skipped (external types lack serde).
 
-**Direction:** Add `serde` support behind a feature flag. Serialize `AccessController` state to JSON, MessagePack, or a custom binary format. Enable:
-
-- Save/restore access control state across restarts
-- Export policy configurations for auditing
-- Transmit capability grants between services
+**Remaining:** Roundtrip test. `AccessController` serialize/deserialize. Policy file I/O.
 
 ### 3. Policy Language
 
@@ -91,11 +97,14 @@ The context feeds into the stability engine — certain capabilities may be cond
 
 **Direction:** A `MultiController` that manages multiple Grassmannians with cross-domain capability translation. A principal in Gr(2,4) accessing a resource in Gr(3,6) requires a morphism between Grassmannians — the Schubert calculus of flag varieties provides this.
 
-### 7. Proof-Carrying Capabilities
+### 7. Proof-Carrying Capabilities — ✅ PARTIALLY DONE (v0.1.0)
 
-**Current:** Capabilities are granted by the controller. No cryptographic verification.
+**Current:** Karpal proof integration complete. `Proven<IsValidCapability, Capability>`,
+property hierarchy (`IsAdminLike: Implies<IsWriteLike>: Implies<IsReadLike>`),
+Rewrite rules, and law checks all implemented behind `karpal` feature.
 
-**Direction:** Capabilities as cryptographic tokens. A principal presents a signed capability, the controller verifies the signature and checks the Schubert intersection. This enables distributed access control where the capability issuer and the verifier are separate services, unified by the geometric computation.
+**Remaining:** Full cryptographic capability tokens (signature verification, distributed
+verification). This requires external crypto — see direction below.
 
 ### 8. Temporal Access Control
 
