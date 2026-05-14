@@ -83,6 +83,9 @@
 //! - `serde` — Enables `Serialize`/`Deserialize` on key types for policy persistence.
 //! - `karpal` — Enables the [`proof`] module with compile-time verification of access
 //!   control invariants via [`karpal_proof::Proven`] and [`karpal_proof::Rewrite`].
+//! - `parallel` — Enables batch operations via [`rayon`]: [`AccessController::check_batch`],
+//!   [`AccessController::stability_batch`], [`AccessController::compose_batch`].
+//!   These compute multiple queries in parallel using amari's batch intersection engine.
 //!
 //! ## `no_std` Support
 //!

@@ -19,21 +19,22 @@ Schubert is **not** an authentication system, a network service, or a replacemen
 
 ## Current State
 
-### Tests: 25 passing (18 base + 7 karpal), 0 failing
+### Tests: 30 passing (with all features), 0 failing
 ```
-unit tests:     25 passed (controller, composition, phantom, proof)
+unit tests:     30 passed (controller, composition, phantom, proof, parallel)
 doc tests:       7 passed
 examples:        3 compile and run
-clippy:          0 warnings (with and without karpal feature)
+clippy:          0 warnings (all feature combos)
 ```
 
 ### Feature Gated
 - `std` (default) — HashMap, SystemTime, thread-safe audit
 - `serde` — Serialize/Deserialize on 11 key types
 - `karpal` — `schubert::proof` module with compile-time verification
+- `parallel` — Batch operations: `check_batch`, `stability_batch`, `compose_batch`
 
 ### Implemented
-- `AccessController` — main entry point. Create principals, register/grant/revoke capabilities, check access
+- `AccessController` — main entry point. Create principals, register/grant/revoke capabilities, check access. Batch operations: `check_batch`, `stability_batch`, `compose_batch` (requires `parallel` feature)
 - `Capability` — Schubert condition with partition, kind (ReadLike/WriteLike/AdminLike/Custom), label, description
 - `Principal` — wraps amari `Namespace`. Identity is external (string ID)
 - `AccessDecision` — `Granted{n, path} | Impossible{conflicting} | Denied | Underconstrained{dim}`
@@ -250,6 +251,8 @@ The IA-MCP server (`ia-mcp`) indexes the ecosystem — 10 libraries, ~10,300 API
 - **Feature gates are additive** — never break existing API:
   - `std` (default) — enables HashMap, SystemTime, Mutex-backed audit
   - `serde` — enables Serialize/Deserialize on key types
+  - `karpal` — enables the proof module with Proven, Rewrite, law checks
+  - `parallel` — enables batch operations via rayon: `check_batch`, `stability_batch`, `compose_batch`
 - **Phantom types** from `amari_enumerative::phantom` are re-exported via `schubert::phantom` for compile-time verification. Compatible with `karpal_proof::Proven` for proof-carrying capabilities.
 - **`no_std` compatibility** — scaffolded with `std` feature gate. HashMap → BTreeMap, Mutex → single-threaded, now_millis() → 0. Full `no_std` requires `amari-enumerative` without `std`.
 

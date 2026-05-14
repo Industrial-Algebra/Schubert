@@ -11,6 +11,8 @@ use amari_enumerative::{IntersectionResult, SchubertCalculus};
 use std::collections::HashMap;
 #[cfg(not(feature = "std"))]
 use alloc::collections::BTreeMap as HashMap;
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 
 /// Access controller for quantitative capability-based authorization.
 ///
@@ -270,6 +272,191 @@ impl AccessController {
         let total_codim: usize = p.namespace.capabilities.iter().map(|c| c.codimension()).sum();
         Ok(dim as isize - total_codim as isize)
     }
+
+    // ── Parallel batch operations ─────────────────────────────────
+
+    /// Check access for multiple (principal, requirements) pairs in parallel.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// # #[cfg(feature = "parallel")]
+    /// # {
+    /// let queries = [
+    ///     (&alice, &["read:data"][..]),
+    ///     (&bob, &["read:data", "write:data"]),
+    /// ];
+    /// let results = acl.check_batch(&queries)?;
+    /// # }
+    /// ```
+    #[cfg(feature = "parallel")]
+    pub fn check_batch(
+        &self,
+        queries: &[(&PrincipalId, &[&str])],
+    ) -> Vec<Result<AccessDecision>> {
+        use amari_enumerative::multi_intersect_batch;
+
+        // Gather all valid queries; track denied ones separately
+        struct Query {
+            index: usize,
+            position: amari_enumerative::SchubertClass,
+            classes: Vec<amari_enumerative::SchubertClass>,
+            required_strs: Vec<String>,
+        }
+
+        let mut valid: Vec<Query> = Vec::with_capacity(queries.len());
+        let mut results: Vec<Option<AccessDecision>> = vec![None; queries.len()];
+
+        for (i, &(principal_id, required)) in queries.iter().enumerate() {
+            let principal = match self.principals.get(principal_id) {
+                Some(p) => p,
+                None => {
+                    results[i] = Some(AccessDecision::Denied);
+                    continue;
+                }
+            };
+
+            // Check holds
+            if required.iter().any(|cid| !principal.holds(cid)) {
+                results[i] = Some(AccessDecision::Denied);
+                continue;
+            }
+
+            // Resolve required capabilities to Schubert classes
+            let mut classes = Vec::with_capacity(required.len());
+            for cap_id_str in required {
+                let cid = CapabilityId::new(*cap_id_str);
+                match self.capabilities.get(&cid) {
+                    Some(cap) => match cap.to_schubert_class(self.grassmannian) {
+                        Ok(cls) => classes.push(cls),
+                        Err(_) => {
+                            classes = vec![];
+                            break;
+                        }
+                    },
+                    None => {
+                        classes = vec![];
+                        break;
+                    }
+                }
+            }
+
+            valid.push(Query {
+                index: i,
+                position: principal.namespace.position.clone(),
+                classes,
+                required_strs: required.iter().map(|s| s.to_string()).collect(),
+            });
+        }
+
+        // Batch intersect valid queries
+        if !valid.is_empty() {
+            let inputs: Vec<_> = valid
+                .iter()
+                .map(|q| {
+                    let mut all = vec![q.position.clone()];
+                    all.extend(q.classes.clone());
+                    (all, self.grassmannian)
+                })
+                .collect();
+
+            let batch_results = multi_intersect_batch(&inputs);
+
+            for (q, result) in valid.into_iter().zip(batch_results.into_iter()) {
+                let decision = match result {
+                    IntersectionResult::Finite(0) => AccessDecision::Impossible {
+                        conflicting: q.required_strs.into_iter().map(CapabilityId::new).collect(),
+                    },
+                    IntersectionResult::Finite(n) => AccessDecision::Granted {
+                        configurations: n,
+                        path: ComputationPath::LittlewoodRichardson,
+                    },
+                    IntersectionResult::PositiveDimensional { dimension, .. } => {
+                        AccessDecision::Underconstrained { dimension }
+                    }
+                    IntersectionResult::Empty => AccessDecision::Denied,
+                };
+                results[q.index] = Some(decision);
+            }
+        }
+
+        results
+            .into_iter()
+            .map(|opt| Ok(opt.unwrap_or(AccessDecision::Denied)))
+            .collect()
+    }
+
+    /// Analyze stability for multiple principals in parallel.
+    ///
+    /// Returns one [`StabilityReport`] per principal.
+    #[cfg(feature = "parallel")]
+    pub fn stability_batch(
+        &self,
+        principal_ids: &[PrincipalId],
+    ) -> Vec<Result<crate::stability::StabilityReport>> {
+        let engine = amari_enumerative::WallCrossingEngine::new(self.grassmannian);
+
+        principal_ids
+            .par_iter()
+            .map(|pid| {
+                let principal = self
+                    .principals
+                    .get(pid)
+                    .ok_or_else(|| SchubertError::PrincipalNotFound(pid.to_string()))?;
+
+                let walls = engine.compute_walls(&principal.namespace);
+                let diagram = engine.phase_diagram(&principal.namespace);
+
+                use std::collections::HashSet;
+                let mut seen = HashSet::new();
+                let breakpoints: Vec<_> = diagram
+                    .into_iter()
+                    .filter_map(|(trust, stable_count)| {
+                        if !seen.insert(stable_count) {
+                            return None;
+                        }
+                        let all_ids: Vec<String> = principal
+                            .namespace
+                            .capabilities
+                            .iter()
+                            .map(|c| c.id.to_string())
+                            .collect();
+                        let stable = all_ids.iter().take(stable_count).cloned().collect();
+                        let unstable: Vec<String> =
+                            all_ids.iter().skip(stable_count).cloned().collect();
+                        Some(crate::stability::StabilityBreakpoint {
+                            trust_level: crate::stability::TrustLevel::new(trust),
+                            stable_capabilities: stable,
+                            unstable_capabilities: unstable,
+                        })
+                    })
+                    .collect();
+
+                Ok(crate::stability::StabilityReport {
+                    principal: pid.clone(),
+                    phase_diagram: breakpoints,
+                    walls,
+                    total_capabilities: principal.capability_count(),
+                })
+            })
+            .collect()
+    }
+
+    /// Compose multiple principal pairs in parallel.
+    ///
+    /// Each tuple is (principal_a, output_cap, principal_b, input_cap).
+    #[cfg(feature = "parallel")]
+    pub fn compose_batch(
+        &self,
+        pairs: &[(&PrincipalId, &str, &PrincipalId, &str)],
+    ) -> Vec<Result<crate::composition::CompositionResult>> {
+        pairs
+            .par_iter()
+            .map(|&(a_id, out_cap, b_id, in_cap)| {
+                crate::composition::compose(self, a_id, out_cap, b_id, in_cap)
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -364,5 +551,171 @@ mod tests {
         assert_eq!(caps[0].id.as_str(), "sigma1_0");
         assert_eq!(caps[1].id.as_str(), "sigma2_0");
         assert_eq!(caps[2].id.as_str(), "sigma11");
+    }
+}
+
+#[cfg(all(test, feature = "parallel"))]
+mod parallel_tests {
+    use super::*;
+    use crate::capability::CapabilityKind;
+
+    fn setup() -> AccessController {
+        let mut acl = AccessController::new(2, 4).unwrap();
+        for (id, partition, kind) in [
+            ("sigma1_a", vec![1], CapabilityKind::ReadLike),
+            ("sigma1_b", vec![1], CapabilityKind::ReadLike),
+            ("sigma1_c", vec![1], CapabilityKind::ReadLike),
+            ("sigma1_d", vec![1], CapabilityKind::ReadLike),
+            ("sigma2", vec![2], CapabilityKind::WriteLike),
+            ("sigma22", vec![2, 2], CapabilityKind::AdminLike),
+        ] {
+            acl.register_capability(Capability::new(id, id, partition, kind))
+                .unwrap();
+        }
+        acl
+    }
+
+    #[test]
+    fn check_batch_multiple_principals() {
+        let mut acl = setup();
+        let p1 = acl.create_principal("alice").unwrap();
+        let p2 = acl.create_principal("bob").unwrap();
+        acl.grant(&p1, "sigma22").unwrap();
+        acl.grant(&p2, "sigma1_a").unwrap();
+        acl.grant(&p2, "sigma1_b").unwrap();
+        acl.grant(&p2, "sigma1_c").unwrap();
+        acl.grant(&p2, "sigma1_d").unwrap();
+
+        let queries: &[(&PrincipalId, &[&str])] = &[
+            (&p1, &["sigma22"]),
+            (&p2, &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"]),
+        ];
+
+        let results = acl.check_batch(queries);
+        assert_eq!(results.len(), 2);
+
+        // Alice: sigma22 = point class → 1 configuration
+        assert_eq!(
+            results[0].as_ref().unwrap(),
+            &AccessDecision::Granted {
+                configurations: 1,
+                path: ComputationPath::LittlewoodRichardson,
+            }
+        );
+
+        // Bob: σ₁⁴ = 2 configurations
+        assert_eq!(
+            results[1].as_ref().unwrap(),
+            &AccessDecision::Granted {
+                configurations: 2,
+                path: ComputationPath::LittlewoodRichardson,
+            }
+        );
+    }
+
+    #[test]
+    fn check_batch_handles_denied_principal() {
+        let mut acl = setup();
+        let p1 = acl.create_principal("alice").unwrap();
+        let p2 = acl.create_principal("bob").unwrap();
+        acl.grant(&p1, "sigma22").unwrap();
+        // Bob has no sigma2
+
+        let queries: &[(&PrincipalId, &[&str])] = &[
+            (&p1, &["sigma22"]),   // granted: point class = 1 config
+            (&p2, &["sigma2"]),    // denied: bob doesn't hold sigma2
+        ];
+
+        let results = acl.check_batch(queries);
+        assert_eq!(results.len(), 2);
+
+        // Alice: sigma22 = 1 config
+        assert_eq!(
+            results[0].as_ref().unwrap(),
+            &AccessDecision::Granted {
+                configurations: 1,
+                path: ComputationPath::LittlewoodRichardson,
+            }
+        );
+
+        // Bob: doesn't hold sigma2 → denied
+        assert_eq!(results[1].as_ref().unwrap(), &AccessDecision::Denied);
+    }
+
+    #[test]
+    fn stability_batch_multiple_principals() {
+        let mut acl = setup();
+        let p1 = acl.create_principal("alice").unwrap();
+        let p2 = acl.create_principal("bob").unwrap();
+        acl.grant(&p1, "sigma1_a").unwrap();
+        acl.grant(&p2, "sigma1_a").unwrap();
+        acl.grant(&p2, "sigma2").unwrap();
+
+        let reports = acl.stability_batch(&[p1.clone(), p2.clone()]);
+        assert_eq!(reports.len(), 2);
+
+        let r1 = reports[0].as_ref().unwrap();
+        let r2 = reports[1].as_ref().unwrap();
+
+        assert_eq!(r1.principal, p1);
+        assert_eq!(r2.principal, p2);
+        assert_eq!(r1.total_capabilities, 1);
+        assert_eq!(r2.total_capabilities, 2);
+    }
+
+    #[test]
+    fn compose_batch_multiple_pairs() {
+        let mut acl = setup();
+        let p1 = acl.create_principal("producer").unwrap();
+        let p2 = acl.create_principal("consumer").unwrap();
+        // Both principals hold sigma1_a — that's the shared interface
+        acl.grant(&p1, "sigma1_a").unwrap();
+        acl.grant(&p1, "sigma2").unwrap();  // extra cap on producer
+        acl.grant(&p2, "sigma1_a").unwrap();
+        acl.grant(&p2, "sigma1_b").unwrap(); // extra cap on consumer
+
+        // Compose via the shared sigma1_a interface
+        let pairs: &[(&PrincipalId, &str, &PrincipalId, &str)] = &[
+            (&p1, "sigma1_a", &p2, "sigma1_a"),
+        ];
+
+        let results = acl.compose_batch(pairs);
+        assert_eq!(results.len(), 1);
+        let result = results[0].as_ref().unwrap();
+        assert!(result.multiplicity > 0);
+        // Retained: sigma2 from p1, sigma1_b from p2 (sigma1_a consumed as interface)
+        assert!(result.retained_capabilities.contains(&"sigma2".to_string()));
+        assert!(result.retained_capabilities.contains(&"sigma1_b".to_string()));
+    }
+
+    #[test]
+    fn check_batch_matches_sequential() {
+        let mut acl = setup();
+        let p1 = acl.create_principal("alice").unwrap();
+        let p2 = acl.create_principal("bob").unwrap();
+        acl.grant(&p1, "sigma22").unwrap();
+        acl.grant(&p2, "sigma1_a").unwrap();
+        acl.grant(&p2, "sigma1_b").unwrap();
+        acl.grant(&p2, "sigma1_c").unwrap();
+        acl.grant(&p2, "sigma1_d").unwrap();
+
+        let queries: &[(&PrincipalId, &[&str])] = &[
+            (&p1, &["sigma22"]),
+            (&p2, &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"]),
+        ];
+
+        // Sequential
+        let seq: Vec<_> = queries
+            .iter()
+            .map(|(pid, reqs)| acl.check(pid, reqs))
+            .collect();
+
+        // Parallel
+        let par = acl.check_batch(queries);
+
+        for (s, p) in seq.iter().zip(par.iter()) {
+            assert_eq!(s.as_ref().unwrap(), p.as_ref().unwrap(),
+                "parallel check_batch must match sequential check");
+        }
     }
 }
