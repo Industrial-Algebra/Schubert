@@ -12,7 +12,7 @@ categories = ["authentication", "mathematics", "data-structures"]
 [features]
 default = ["std"]
 std = []
-serde = ["dep:serde", "amari-enumerative/serde"]
+serde = ["dep:serde", "dep:serde_json", "amari-enumerative/serde"]
 karpal = ["dep:karpal-proof"]
 parallel = ["dep:rayon", "amari-enumerative/parallel"]
 
@@ -20,11 +20,11 @@ parallel = ["dep:rayon", "amari-enumerative/parallel"]
 amari-enumerative = { path = "../amari/amari-enumerative", features = ["tropical-schubert"] }
 thiserror = "2"
 serde = { version = "1", optional = true, features = ["derive"] }
+serde_json = { version = "1", optional = true }
 karpal-proof = { path = "../karpal/karpal-proof", optional = true }
 rayon = { version = "1", optional = true }
 
 [dev-dependencies]
-serde_json = "1"
 
 [[example]]
 name = "rbac"

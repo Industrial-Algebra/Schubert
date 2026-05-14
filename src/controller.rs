@@ -140,7 +140,12 @@ impl AccessController {
             SchubertError::Enumerative(
                 amari_enumerative::EnumerativeError::SchubertError(e.to_string()),
             )
-        })
+        })?;
+
+        // Track grant for serialization roundtrip
+        principal.granted_capability_ids.push(capability_id.to_string());
+
+        Ok(())
     }
 
     /// Revoke a capability from a principal.
@@ -159,6 +164,7 @@ impl AccessController {
         }
 
         principal.namespace.revoke(&amari_cid);
+        principal.granted_capability_ids.retain(|id| id != capability_id);
         Ok(())
     }
 
@@ -604,6 +610,76 @@ impl AccessController {
             })
             .collect()
     }
+
+    // ── Serialization helpers ────────────────────────────────────
+
+    /// Rebuild all principal namespaces from their tracked grant IDs.
+    ///
+    /// After deserialization, principal namespaces are placeholders.
+    /// This method rebuilds them with the correct Grassmannian parameters
+    /// and re-grants all tracked capabilities.
+    #[cfg(feature = "serde")]
+    pub fn rebuild_principal_namespaces(&mut self) -> Result<()> {
+        let (k, n) = self.grassmannian;
+        for principal in self.principals.values_mut() {
+            let namespace = amari_enumerative::NamespaceBuilder::new(principal.id.as_str(), k, n)
+                .build()
+                .map_err(SchubertError::Enumerative)?;
+            principal.namespace = namespace;
+
+            let grant_ids: Vec<String> = principal.granted_capability_ids.clone();
+            for cap_id_str in &grant_ids {
+                let our_cap = self
+                    .capabilities
+                    .get(&CapabilityId::new(cap_id_str.as_str()))
+                    .ok_or_else(|| SchubertError::CapabilityNotFound(cap_id_str.to_string()))?
+                    .clone();
+
+                let amari_cap = amari_enumerative::Capability::new(
+                    our_cap.id.to_string(),
+                    our_cap.label.clone(),
+                    our_cap.partition.clone(),
+                    self.grassmannian,
+                )
+                .map_err(SchubertError::Enumerative)?;
+
+                principal.namespace.grant(amari_cap).map_err(|e| {
+                    SchubertError::Enumerative(
+                        amari_enumerative::EnumerativeError::SchubertError(e.to_string()),
+                    )
+                })?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Serialize the controller state to a JSON string.
+    #[cfg(feature = "serde")]
+    pub fn to_json(&self) -> serde_json::Result<String> {
+        serde_json::to_string_pretty(self)
+    }
+
+    /// Deserialize the controller state from a JSON string.
+    #[cfg(feature = "serde")]
+    pub fn from_json(json: &str) -> serde_json::Result<Self> {
+        serde_json::from_str(json)
+    }
+
+    /// Save the controller state to a file.
+    #[cfg(all(feature = "serde", feature = "std"))]
+    pub fn save_to_file(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+        let json = serde_json::to_string_pretty(self)
+            .map_err(std::io::Error::other)?;
+        std::fs::write(path, json)
+    }
+
+    /// Load the controller state from a file.
+    #[cfg(all(feature = "serde", feature = "std"))]
+    pub fn load_from_file(path: impl AsRef<std::path::Path>) -> std::io::Result<Self> {
+        let json = std::fs::read_to_string(path)?;
+        serde_json::from_str(&json)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }
 }
 
 /// Map an amari `IntersectionResult` to a Schubert `AccessDecision`.
@@ -624,6 +700,71 @@ fn map_intersection_result(
             AccessDecision::Underconstrained { dimension }
         }
         IntersectionResult::Empty => AccessDecision::Denied,
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Serialization
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for AccessController {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("AccessController", 3)?;
+        state.serialize_field("grassmannian", &self.grassmannian)?;
+        state.serialize_field(
+            "capabilities",
+            &self.capabilities.values().collect::<Vec<_>>(),
+        )?;
+        state.serialize_field(
+            "principals",
+            &self.principals.values().collect::<Vec<_>>(),
+        )?;
+        state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for AccessController {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        struct ControllerData {
+            grassmannian: (usize, usize),
+            capabilities: Vec<crate::Capability>,
+            principals: Vec<crate::Principal>,
+        }
+
+        let data = ControllerData::deserialize(deserializer)?;
+
+        let (k, n) = data.grassmannian;
+        if k == 0 || n < 2 || k >= n {
+            return Err(serde::de::Error::custom(format!(
+                "invalid Grassmannian Gr({k},{n})"
+            )));
+        }
+
+        let mut controller = AccessController {
+            grassmannian: (k, n),
+            capabilities: HashMap::new(),
+            principals: HashMap::new(),
+            audit_sink: None,
+        };
+
+        for cap in data.capabilities {
+            controller.capabilities.insert(cap.id.clone(), cap);
+        }
+        for principal in data.principals {
+            controller.principals.insert(principal.id.clone(), principal);
+        }
+
+        controller
+            .rebuild_principal_namespaces()
+            .map_err(serde::de::Error::custom)?;
+
+        Ok(controller)
     }
 }
 
@@ -1066,5 +1207,186 @@ mod parallel_tests {
             assert_eq!(s.as_ref().unwrap(), p.as_ref().unwrap(),
                 "parallel check_batch must match sequential check");
         }
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests {
+    use super::*;
+    use crate::capability::CapabilityKind;
+
+    fn setup() -> AccessController {
+        let mut acl = AccessController::new(2, 4).unwrap();
+        for (id, partition, kind) in [
+            ("read", vec![1], CapabilityKind::ReadLike),
+            ("write", vec![2], CapabilityKind::WriteLike),
+            ("admin", vec![2, 2], CapabilityKind::AdminLike),
+            ("internal", vec![1, 1], CapabilityKind::WriteLike),
+        ] {
+            acl.register_capability(Capability::new(id, id, partition, kind))
+                .unwrap();
+        }
+        acl
+    }
+
+    #[test]
+    fn roundtrip_empty_controller() {
+        let acl = AccessController::new(2, 4).unwrap();
+        let json = acl.to_json().unwrap();
+        let restored = AccessController::from_json(&json).unwrap();
+        assert_eq!(restored.grassmannian(), (2, 4));
+        assert_eq!(restored.capabilities().count(), 0);
+    }
+
+    #[test]
+    fn roundtrip_with_capabilities() {
+        let acl = setup();
+        let json = acl.to_json().unwrap();
+        let restored = AccessController::from_json(&json).unwrap();
+
+        assert_eq!(restored.grassmannian(), (2, 4));
+        assert_eq!(restored.capabilities().count(), 4);
+        assert!(restored.capability("read").is_some());
+        assert!(restored.capability("write").is_some());
+        assert!(restored.capability("admin").is_some());
+        assert!(restored.capability("internal").is_some());
+    }
+
+    #[test]
+    fn roundtrip_principals_preserved() {
+        let mut acl = setup();
+        let alice = acl.create_principal("alice").unwrap();
+        let bob = acl.create_principal("bob").unwrap();
+        acl.grant(&alice, "read").unwrap();
+        acl.grant(&bob, "read").unwrap();
+        acl.grant(&bob, "write").unwrap();
+
+        let json = acl.to_json().unwrap();
+        let restored = AccessController::from_json(&json).unwrap();
+
+        let alice_restored = restored.principal(&alice).unwrap();
+        let bob_restored = restored.principal(&bob).unwrap();
+
+        assert!(alice_restored.holds("read"));
+        assert!(!alice_restored.holds("write"));
+        assert!(bob_restored.holds("read"));
+        assert!(bob_restored.holds("write"));
+    }
+
+    #[test]
+    fn roundtrip_decisions_match() {
+        let mut acl = setup();
+        let alice = acl.create_principal("alice").unwrap();
+        let bob = acl.create_principal("bob").unwrap();
+        acl.grant(&alice, "read").unwrap();
+        acl.grant(&alice, "write").unwrap();
+        acl.grant(&bob, "admin").unwrap();
+
+        // Capture decisions before serialization
+        let before_checks = [
+            acl.check(&alice, &["read"]).unwrap(),
+            acl.check(&alice, &["read", "write"]).unwrap(),
+            acl.check(&bob, &["admin"]).unwrap(),
+            acl.check(&alice, &["admin"]).unwrap(), // alice doesn't have admin
+        ];
+
+        // Roundtrip
+        let json = acl.to_json().unwrap();
+        let restored = AccessController::from_json(&json).unwrap();
+
+        // Same checks after deserialization
+        let after_checks = [
+            restored.check(&alice, &["read"]).unwrap(),
+            restored.check(&alice, &["read", "write"]).unwrap(),
+            restored.check(&bob, &["admin"]).unwrap(),
+            restored.check(&alice, &["admin"]).unwrap(),
+        ];
+
+        assert_eq!(before_checks, after_checks,
+            "all access decisions must survive roundtrip");
+    }
+
+    #[test]
+    fn roundtrip_sigma1_fourth_equals_2() {
+        let mut acl = setup();
+        // Register four sigma1 capabilities and grant them
+        for i in 0..4 {
+            let id = format!("sigma1_{i}");
+            acl.register_capability(Capability::new(
+                id.clone(), id.clone(), vec![1], CapabilityKind::ReadLike,
+            )).unwrap();
+        }
+        let p = acl.create_principal("test").unwrap();
+        for i in 0..4 {
+            acl.grant(&p, &format!("sigma1_{i}")).unwrap();
+        }
+
+        let before = acl.check(&p, &["sigma1_0", "sigma1_1", "sigma1_2", "sigma1_3"]).unwrap();
+
+        let json = acl.to_json().unwrap();
+        let restored = AccessController::from_json(&json).unwrap();
+
+        // Use the same principal ID to look up after restore
+        let rp = restored.principal(&p).unwrap();
+        let after = restored.check(&rp.id, &["sigma1_0", "sigma1_1", "sigma1_2", "sigma1_3"]).unwrap();
+
+        assert_eq!(before, after, "σ₁⁴=2 must survive roundtrip");
+    }
+
+    #[test]
+    fn roundtrip_impossible_detected() {
+        let mut acl = setup();
+        let p = acl.create_principal("test").unwrap();
+        acl.grant(&p, "write").unwrap();   // σ₂
+        acl.grant(&p, "internal").unwrap(); // σ₁₁
+
+        let before = acl.check(&p, &["write", "internal"]).unwrap();
+        assert!(matches!(before, AccessDecision::Impossible { .. }));
+
+        let json = acl.to_json().unwrap();
+        let restored = AccessController::from_json(&json).unwrap();
+
+        let rp = restored.principal(&p).unwrap();
+        let after = restored.check(&rp.id, &["write", "internal"]).unwrap();
+        assert!(matches!(after, AccessDecision::Impossible { .. }),
+            "impossibility detection must survive roundtrip");
+    }
+
+    #[test]
+    fn roundtrip_revoke_preserved() {
+        let mut acl = setup();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "read").unwrap();
+        acl.grant(&p, "write").unwrap();
+        acl.revoke(&p, "write").unwrap();
+
+        assert!(acl.principal(&p).unwrap().holds("read"));
+        assert!(!acl.principal(&p).unwrap().holds("write"));
+
+        let json = acl.to_json().unwrap();
+        let restored = AccessController::from_json(&json).unwrap();
+
+        assert!(restored.principal(&p).unwrap().holds("read"));
+        assert!(!restored.principal(&p).unwrap().holds("write"));
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn file_save_load_roundtrip() {
+        let mut acl = setup();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "read").unwrap();
+        acl.grant(&p, "write").unwrap();
+
+        let before = acl.check(&p, &["read", "write"]).unwrap();
+
+        let tmp = std::env::temp_dir().join("schubert_test_policy.json");
+        acl.save_to_file(&tmp).unwrap();
+        let restored = AccessController::load_from_file(&tmp).unwrap();
+        let _ = std::fs::remove_file(&tmp);
+
+        let rp = restored.principal(&p).unwrap();
+        let after = restored.check(&rp.id, &["read", "write"]).unwrap();
+        assert_eq!(before, after, "file save/load must preserve decisions");
     }
 }

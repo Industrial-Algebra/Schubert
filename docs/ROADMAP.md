@@ -36,12 +36,17 @@ Auto-routing via `check_auto()`: Gr(k,n) with n ≤ 8 uses LR, larger uses Local
 **Verified:** σ₁⁴=2 and σ₂·σ₁₁=0 consistent across LR, Localization, and Tropical paths.
 Matroid correctly detects impossibility.
 
-### 2. Serialization and Persistence — ✅ PARTIALLY DONE (v0.1.0)
+### 2. Serialization and Persistence — ✅ DONE (v0.1.0)
 
-**Current:** `serde` feature gate added. Derives on all key types. `Principal.namespace`
-and `StabilityReport.walls` are skipped (external types lack serde).
+**Implemented:** Full `AccessController` serde with roundtrip fidelity:
+- `Serialize` + `Deserialize` on `AccessController` (audit sink skipped)
+- `Principal.granted_capability_ids` tracks grants for namespace reconstruction
+- `rebuild_principal_namespaces()` restores amari namespaces after deserialization
+- `to_json()` / `from_json()` convenience methods
+- `save_to_file()` / `load_from_file()` file I/O (requires `std`)
 
-**Remaining:** Roundtrip test. `AccessController` serialize/deserialize. Policy file I/O.
+**Verified:** 8 roundtrip tests covering empty controller, capabilities, principals,
+access decisions (including σ₁⁴=2 and σ₂·σ₁₁ impossibility), grants, revokes, and file I/O.
 
 ### 3. Policy Language
 

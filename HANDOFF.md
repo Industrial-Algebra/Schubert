@@ -272,10 +272,11 @@ The IA-MCP server (`ia-mcp`) indexes the ecosystem — 10 libraries, ~10,300 API
 3. Update the `CapabilityKind` table in `README.md`
 
 ### Adding Serialization
-1. ✅ `serde` feature added to `Cargo.toml`
-2. ✅ Derive `Serialize, Deserialize` on `Capability`, `CapabilityId`, `CapabilityKind`, `PrincipalId`, `Principal` (namespace skipped), `AccessDecision`, `ComputationPath`, `CompositionResult`, `TrustLevel`, `StabilityBreakpoint`, `StabilityReport` (walls skipped), `DecisionRecord`
-3. Add roundtrip test: serialize → deserialize → same decisions
-4. ✅ Gated behind `#[cfg(feature = "serde")]`
+1. ✅ `serde` feature added to `Cargo.toml` (includes `serde_json` for JSON I/O)
+2. ✅ Derive `Serialize, Deserialize` on all key types: `Capability`, `CapabilityId`, `CapabilityKind`, `PrincipalId`, `Principal` (namespace skipped, granted_capability_ids tracked), `AccessDecision`, `ComputationPath`, `CompositionResult`, `TrustLevel`, `StabilityBreakpoint`, `StabilityReport` (walls skipped), `DecisionRecord`
+3. ✅ `AccessController` implements `Serialize`/`Deserialize` with `rebuild_principal_namespaces()` for roundtrip fidelity
+4. ✅ Convenience methods: `to_json()`, `from_json()`, `save_to_file()`, `load_from_file()`
+5. ✅ Roundtrip tests (8 tests): empty, capabilities, principals, access decisions, σ₁⁴=2, impossibility, revoke, file I/O
 
 ---
 
