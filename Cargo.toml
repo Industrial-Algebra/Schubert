@@ -1,6 +1,29 @@
 [package]
-name = "Schubert"
+name = "schubert"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+rust-version = "1.75"
+description = "Schubert calculus as a practical access control system — quantitative capability-based authorization"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/industrial-algebra/Schubert"
+keywords = ["access-control", "authorization", "schubert-calculus", "capability", "security"]
+categories = ["authentication", "mathematics", "data-structures"]
 
 [dependencies]
+amari-enumerative = { path = "../amari/amari-enumerative", features = ["tropical-schubert"] }
+thiserror = "2"
+
+[dev-dependencies]
+serde_json = "1"
+
+[[example]]
+name = "rbac"
+path = "examples/rbac.rs"
+
+[[example]]
+name = "api_gateway"
+path = "examples/api_gateway.rs"
+
+[[example]]
+name = "row_security"
+path = "examples/row_security.rs"
