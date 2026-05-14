@@ -523,7 +523,7 @@ impl AccessController {
 
             let batch_results = multi_intersect_batch(&inputs);
 
-            for (q, result) in valid.into_iter().zip(batch_results.into_iter()) {
+            for (q, result) in valid.into_iter().zip(batch_results) {
                 let decision = match result {
                     IntersectionResult::Finite(0) => AccessDecision::Impossible {
                         conflicting: q.required_strs.into_iter().map(CapabilityId::new).collect(),
