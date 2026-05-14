@@ -37,6 +37,7 @@
 
 use crate::capability::CapabilityId;
 use crate::decision::AccessDecision;
+#[cfg(feature = "std")]
 use crate::error::Result;
 use crate::principal::PrincipalId;
 
@@ -62,6 +63,9 @@ pub struct DecisionRecord {
 /// Implementations write to files, databases, log streams, or any
 /// other storage. The trait is synchronous by design — audit recording
 /// should not introduce async complexity into the access check hot path.
+///
+/// Requires the `std` feature (not available on wasm).
+#[cfg(feature = "std")]
 pub trait AuditSink: Send + Sync {
     /// Record an access control decision.
     ///
@@ -72,11 +76,9 @@ pub trait AuditSink: Send + Sync {
 
 /// An in-memory audit log for testing and small deployments.
 ///
-/// Stores records in a `Vec<DecisionRecord>` behind a mutex. Not suitable
-/// for production (not persistent, unbounded memory growth), but useful for
-/// tests, examples, and development.
-///
-/// Requires the `std` feature (enabled by default).
+/// Stores records in a `Vec<DecisionRecord>` behind a mutex (std) or
+/// `RefCell` (no_std). Not suitable for production (not persistent,
+/// unbounded memory growth), but useful for tests, examples, and development.
 #[derive(Debug, Default)]
 pub struct InMemoryAudit {
     #[cfg(feature = "std")]
@@ -128,20 +130,10 @@ impl InMemoryAudit {
     }
 }
 
+#[cfg(feature = "std")]
 impl AuditSink for InMemoryAudit {
-    #[cfg(feature = "std")]
     fn record(&self, record: &DecisionRecord) -> Result<()> {
         self.records.lock().unwrap().push(record.clone());
-        Ok(())
-    }
-
-    #[cfg(not(feature = "std"))]
-    fn record(&self, record: &DecisionRecord) -> Result<()> {
-        // Note: without std, InMemoryAudit is not thread-safe.
-        // This is acceptable for single-threaded no_std environments.
-        // SAFETY: In single-threaded no_std, this is safe.
-        let records = &self.records as *const alloc::vec::Vec<DecisionRecord> as *mut alloc::vec::Vec<DecisionRecord>;
-        unsafe { &mut *records }.push(record.clone());
         Ok(())
     }
 }

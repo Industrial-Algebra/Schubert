@@ -15,6 +15,7 @@ std = []
 serde = ["dep:serde", "dep:serde_json", "amari-enumerative/serde"]
 karpal = ["dep:karpal-proof"]
 parallel = ["dep:rayon", "amari-enumerative/parallel"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys", "amari-enumerative/wasm"]
 
 [dependencies]
 amari-enumerative = { path = "../amari/amari-enumerative", features = ["tropical-schubert"] }
@@ -23,6 +24,8 @@ serde = { version = "1", optional = true, features = ["derive"] }
 serde_json = { version = "1", optional = true }
 karpal-proof = { path = "../karpal/karpal-proof", optional = true }
 rayon = { version = "1", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+js-sys = { version = "0.3", optional = true }
 
 [dev-dependencies]
 
