@@ -35,17 +35,31 @@ pub struct PrincipalId(pub String);
 
 impl PrincipalId {
     /// Create a new principal ID.
-    pub fn new(id: impl Into<String>) -> Self { Self(id.into()) }
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
     /// Return the inner string.
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Display for PrincipalId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.0) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
-impl From<&str> for PrincipalId { fn from(s: &str) -> Self { Self(s.to_string()) } }
-impl From<String> for PrincipalId { fn from(s: String) -> Self { Self(s) } }
+impl From<&str> for PrincipalId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+impl From<String> for PrincipalId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
 
 /// A principal — an identity that holds capabilities.
 ///
@@ -119,7 +133,12 @@ impl Principal {
         let namespace = NamespaceBuilder::new(pid.as_str(), k, n)
             .build()
             .map_err(crate::error::SchubertError::Enumerative)?;
-        Ok(Self { id: pid, namespace, granted_capability_ids: Vec::new(), created_at: now_millis() })
+        Ok(Self {
+            id: pid,
+            namespace,
+            granted_capability_ids: Vec::new(),
+            created_at: now_millis(),
+        })
     }
 
     /// Number of capabilities held by this principal.
@@ -156,5 +175,7 @@ pub(crate) fn now_millis() -> u64 {
             .unwrap_or(0)
     }
     #[cfg(any(not(feature = "std"), target_arch = "wasm32"))]
-    { 0 }
+    {
+        0
+    }
 }

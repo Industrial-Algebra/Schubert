@@ -125,7 +125,7 @@ pub mod stability;
 // Core types — everything you typically need
 pub use audit::{AuditSink, DecisionRecord, InMemoryAudit};
 pub use capability::{Capability, CapabilityId, CapabilityKind};
-pub use composition::{compose, are_composable, CompositionResult};
+pub use composition::{are_composable, compose, CompositionResult};
 pub use controller::AccessController;
 pub use decision::{AccessDecision, ComputationPath};
 pub use error::{Result, SchubertError};

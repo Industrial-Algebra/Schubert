@@ -41,17 +41,31 @@ pub struct CapabilityId(pub String);
 
 impl CapabilityId {
     /// Create a new capability ID from a string.
-    pub fn new(id: impl Into<String>) -> Self { Self(id.into()) }
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
     /// Return the inner string reference.
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Display for CapabilityId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.0) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
-impl From<&str> for CapabilityId { fn from(s: &str) -> Self { Self(s.to_string()) } }
-impl From<String> for CapabilityId { fn from(s: String) -> Self { Self(s) } }
+impl From<&str> for CapabilityId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+impl From<String> for CapabilityId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
 
 /// Semantic classification of a capability.
 ///
@@ -113,7 +127,13 @@ impl Capability {
         partition: Vec<usize>,
         kind: CapabilityKind,
     ) -> Self {
-        Self { id: id.into(), label: label.into(), description: String::new(), partition, kind }
+        Self {
+            id: id.into(),
+            label: label.into(),
+            description: String::new(),
+            partition,
+            kind,
+        }
     }
 
     /// Create a new capability with a description.
@@ -124,7 +144,13 @@ impl Capability {
         partition: Vec<usize>,
         kind: CapabilityKind,
     ) -> Self {
-        Self { id: id.into(), label: label.into(), description: description.into(), partition, kind }
+        Self {
+            id: id.into(),
+            label: label.into(),
+            description: description.into(),
+            partition,
+            kind,
+        }
     }
 
     /// The codimension of this capability — the sum of partition parts.
@@ -152,11 +178,15 @@ impl Capability {
 }
 
 impl PartialEq for Capability {
-    fn eq(&self, other: &Self) -> bool { self.id == other.id }
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }
 
 impl Eq for Capability {}
 
 impl std::hash::Hash for Capability {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) { self.id.hash(state); }
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
 }

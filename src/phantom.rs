@@ -11,15 +11,15 @@
 //!
 //! | Category | Marker Trait | States |
 //! |----------|-------------|--------|
-//! | Partition validity | [`PartitionValidity`] | [`ValidPartition`], [`UnvalidatedPartition`] |
-//! | Grassmannian containment | [`BoxContainment`] | [`FitsInBox`], [`UnverifiedBox`] |
-//! | Capability grant lifecycle | [`GrantState`] | [`Granted`], [`Pending`], [`Revoked`] |
-//! | Intersection dimension | [`IntersectionDimension`] | [`Transverse`], [`Excess`], [`Deficient`] |
+//! | Partition validity | `PartitionValidity` | `ValidPartition`, `UnvalidatedPartition` |
+//! | Grassmannian containment | `BoxContainment` | `FitsInBox`, `UnverifiedBox` |
+//! | Capability grant lifecycle | `GrantState` | `Granted`, `Pending`, `Revoked` |
+//! | Intersection dimension | `IntersectionDimension` | `Transverse`, `Excess`, `Deficient` |
 //!
 //! # Composite Aliases (from amari)
 //!
-//! - [`ValidSchubertClass`] = `(ValidPartition, FitsInBox)` — fully validated capability
-//! - [`ValidLRTableau`] = `(Semistandard, LatticeWord)` — valid LR tableau
+//! - `ValidSchubertClass` = `(ValidPartition, FitsInBox)` — fully validated capability
+//! - `ValidLRTableau` = `(Semistandard, LatticeWord)` — valid LR tableau
 //!
 //! # Usage
 //!
@@ -32,20 +32,35 @@
 //! ```
 
 pub use amari_enumerative::phantom::{
-    // Partition validity
-    PartitionValidity, UnvalidatedPartition, ValidPartition,
-    // Tableau properties
-    LatticeWord, Semistandard, TableauValidity, UnverifiedTableau, ValidLRTableau,
-    // Capability grant states
-    Granted, GrantState, Pending, Revoked,
-    // Intersection dimension
-    Deficient, Excess, IntersectionDimension, Transverse, UnknownDimension,
     // Grassmannian containment
-    BoxContainment, FitsInBox, UnverifiedBox,
-    // Composite
-    ValidSchubertClass,
+    BoxContainment,
+    // Intersection dimension
+    Deficient,
+    Excess,
+    FitsInBox,
+    GrantState,
+    // Capability grant states
+    Granted,
+    IntersectionDimension,
+    // Tableau properties
+    LatticeWord,
+    // Partition validity
+    PartitionValidity,
+    Pending,
     // Generic wrapper
     Properties,
+    Revoked,
+    Semistandard,
+    TableauValidity,
+    Transverse,
+    UnknownDimension,
+    UnvalidatedPartition,
+    UnverifiedBox,
+    UnverifiedTableau,
+    ValidLRTableau,
+    ValidPartition,
+    // Composite
+    ValidSchubertClass,
 };
 
 /// Phantom markers specific to Schubert access control.

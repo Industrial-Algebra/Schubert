@@ -55,9 +55,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::{
-    Capability, CapabilityKind, Result, SchubertError,
-};
+use crate::{Capability, CapabilityKind, Result, SchubertError};
 
 /// A complete access control policy in declarative form.
 ///
