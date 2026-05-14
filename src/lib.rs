@@ -78,6 +78,8 @@
 //! - `std` (default) — Enables `std::collections::HashMap`, `SystemTime` timestamps,
 //!   and thread-safe audit via `Mutex`. Disable for `no_std` environments.
 //! - `serde` — Enables `Serialize`/`Deserialize` on key types for policy persistence.
+//! - `karpal` — Enables the [`proof`] module with compile-time verification of access
+//!   control invariants via [`karpal_proof::Proven`] and [`karpal_proof::Rewrite`].
 //!
 //! ## `no_std` Support
 //!
@@ -103,6 +105,9 @@ pub mod error;
 /// Compile-time phantom type markers from amari-enumerative.
 pub mod phantom;
 pub mod principal;
+/// Proof-carrying access control via Karpal (requires `karpal` feature).
+#[cfg(feature = "karpal")]
+pub mod proof;
 pub mod stability;
 
 // Core types — everything you typically need

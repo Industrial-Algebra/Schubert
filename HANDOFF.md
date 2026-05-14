@@ -3,7 +3,7 @@
 **Project:** Quantitative access control via Schubert calculus
 **Location:** `/home/elliotthall/working/industrial-algebra/Schubert`
 **Date:** May 2026
-**Status:** Foundation complete (0.1.0). Fully documented. Ready for extension.
+**Status:** Foundation complete (0.1.0). IA-conformant. Karpal-integrated. Ready for extension.
 
 ---
 
@@ -19,13 +19,18 @@ Schubert is **not** an authentication system, a network service, or a replacemen
 
 ## Current State
 
-### Tests: 18 passing, 0 failing
+### Tests: 25 passing (18 base + 7 karpal), 0 failing
 ```
-unit tests:     11 passed (controller, composition, phantom)
+unit tests:     25 passed (controller, composition, phantom, proof)
 doc tests:       7 passed
 examples:        3 compile and run
-clippy:          0 warnings
+clippy:          0 warnings (with and without karpal feature)
 ```
+
+### Feature Gated
+- `std` (default) — HashMap, SystemTime, thread-safe audit
+- `serde` — Serialize/Deserialize on 11 key types
+- `karpal` — `schubert::proof` module with compile-time verification
 
 ### Implemented
 - `AccessController` — main entry point. Create principals, register/grant/revoke capabilities, check access
@@ -37,7 +42,8 @@ clippy:          0 warnings
 - Stability analysis — `analyze_stability()`, `stable_capabilities_at()`, wall-crossing phase diagrams
 - Audit — pluggable `AuditSink` trait, `InMemoryAudit`, `DecisionRecord`
 - Examples: rbac (Kubernetes roles), api_gateway (OAuth scope conflict), row_security (multi-tenant DB)
-- Docs: README, module-level docs for all 8 modules, method docs on every public function, `docs/ROADMAP.md`, `docs/surreal-trust-levels.md`
+- **Karpal integration** — `proof` module with Proven wrappers, Property hierarchy, Rewrite rules, law checks
+- Docs: README, module-level docs for all 10 modules, method docs on every public function, `docs/ROADMAP.md`, `docs/surreal-trust-levels.md`
 
 ### Fundamental Checks Verified
 - σ₁⁴ = 2 in Gr(2,4) ✅
@@ -52,7 +58,7 @@ clippy:          0 warnings
 
 ```
 Schubert/
-├── Cargo.toml              # Depends on: amari-enumerative (path dep), thiserror, optional serde
+├── Cargo.toml              # Depends on: amari-enumerative (path dep), thiserror, optional serde, optional karpal-proof
 ├── rust-toolchain.toml      # Nightly channel, rustfmt + clippy (IA ecosystem standard)
 ├── README.md               # Full mathematical background, API reference
 ├── src/
@@ -65,6 +71,7 @@ Schubert/
 │   ├── stability.rs        # analyze_stability(), TrustLevel, StabilityReport
 │   ├── audit.rs            # AuditSink trait, InMemoryAudit, DecisionRecord
 │   ├── phantom.rs          # Re-exports of amari phantom types for compile-time verification
+│   ├── proof.rs            # Karpal integration: Proven, Property, Rewrite, law checks
 │   └── error.rs            # SchubertError enum, Result alias
 ├── examples/
 │   ├── rbac.rs             # Kubernetes 4-role model
@@ -84,6 +91,33 @@ Optional dependencies (behind feature gates):
 - `serde` (v1, optional) — serialize/deserialize controller state
 
 No tokio, no async runtime, no network stack. Synchronous API. Embeddable anywhere Rust compiles.
+
+### Karpal Proof Integration (`karpal` feature)
+
+Schubert integrates [`karpal-proof`](https://github.com/Industrial-Algebra/Karpal) (v0.3.0)
+for compile-time verification of access control invariants:
+
+| Feature | What It Provides |
+|---------|-----------------|
+| `Proven<IsValidCapability, Capability>` | Proof that a capability's partition is valid |
+| `Proven<IsFiniteAccess, AccessDecision>` | Proof that an access check is finite (transverse) |
+| Property hierarchy | `IsAdminLike: Implies<IsWriteLike>: Implies<IsReadLike>` |
+| `Rewrite<GrantSeqAB, GrantSeqBA, _>` | Type-level proof that grant order is commutative |
+| `law::check_*` | Runtime verification of grant idempotency, revoke identity, access idempotency |
+
+Usage:
+```rust
+use schubert::proof::{IsValidCapability, prove_capability};
+
+let cap = Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike);
+let proven = cap.prove((2, 4))?;  // validates partition, returns Proven<IsValidCapability, Capability>
+
+// Derive property: admin capability implies write capability
+use schubert::proof::IsAdminLike;
+use karpal_proof::Proven;
+let admin: Proven<IsAdminLike, Capability> = unsafe { Proven::axiom(admin_cap) };
+let write: Proven<IsWriteLike, Capability> = admin.derive();  // compile-time safe
+```
 
 ---
 
@@ -163,8 +197,11 @@ Make `amari-enumerative` wasm-compatible for the subset Schubert uses. Enable br
 **6. Multi-Grassmannian Controllers**
 Cross-domain access: a principal in Gr(2,4) accessing a resource in Gr(3,6) requires a morphism between Grassmannians.
 
-**7. Proof-Carrying Capabilities**
-Capabilities as cryptographic tokens. Verify signature, check Schubert intersection. Distributed access control with geometric guarantees.
+**7. Proof-Carrying Capabilities** — ✅ KARPAL INTEGRATED
+Capabilities can be proven valid at compile time via `Proven<IsValidCapability, Capability>`.
+Property hierarchy for CapabilityKind via `Implies`. Rewrite rules for policy transformation.
+Runtime law checking for access control invariants. Full cryptographic capability tokens
+still future work.
 
 ### Far-Term (Speculative)
 

@@ -91,6 +91,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "karpal-algebra"
+version = "0.3.0"
+dependencies = [
+ "karpal-core",
+]
+
+[[package]]
+name = "karpal-core"
+version = "0.3.0"
+
+[[package]]
+name = "karpal-proof"
+version = "0.3.0"
+dependencies = [
+ "karpal-algebra",
+ "karpal-core",
+ "karpal-proof-derive",
+]
+
+[[package]]
+name = "karpal-proof-derive"
+version = "0.3.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -178,6 +207,7 @@ name = "schubert"
 version = "0.1.0"
 dependencies = [
  "amari-enumerative",
+ "karpal-proof",
  "serde",
  "serde_json",
  "thiserror",
