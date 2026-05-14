@@ -19,9 +19,9 @@ Schubert is **not** an authentication system, a network service, or a replacemen
 
 ## Current State
 
-### Tests: 30 passing (with all features), 0 failing
+### Tests: 39 passing (with all features), 0 failing
 ```
-unit tests:     30 passed (controller, composition, phantom, proof, parallel)
+unit tests:     39 passed (controller, composition, phantom, proof, parallel)
 doc tests:       7 passed
 examples:        3 compile and run
 clippy:          0 warnings (all feature combos)
@@ -178,8 +178,9 @@ cargo doc --open
 
 ### Immediate (Low Risk, High Value)
 
-**1. Computation Path Selection** (ROADMAP #1)
-Current `check_with_path()` ignores the path parameter. Expose amari's 4 computation paths (LR, localization, tropical, matroid) and implement auto-routing based on Grassmannian size and class count.
+**1. Computation Path Selection** (ROADMAP #1) — ✅ DONE
+`check_with_path` now routes to all 4 computation paths (LR, Localization, Tropical, Matroid).
+`check_auto()` selects path based on Grassmannian size. 9 new tests verifying path consistency.
 
 **2. Serialization** (ROADMAP #2) — ✅ PARTIALLY DONE
 `serde` feature gate added. Derives on all key types. `Principal.namespace` and `StabilityReport.walls` are skipped (external types don't impl serde). Remaining: roundtrip test, `AccessController` serde integration.

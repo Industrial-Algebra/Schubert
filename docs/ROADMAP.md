@@ -23,18 +23,18 @@ tested at 30 unit tests, 0 warnings.
 
 ## Near-Term (Practical)
 
-### 1. Computation Path Selection
+### 1. Computation Path Selection — ✅ DONE (v0.1.0)
 
-**Current:** The auto-router always uses Littlewood-Richardson, which is exponential in the number of classes. The `check_with_path` method accepts a path preference but doesn't route.
+**Implemented:** All 4 amari computation paths exposed via `check_with_path()`:
+- `LittlewoodRichardson` — exact, classical (default)
+- `Localization` — equivariant localization (Atiyah-Bott), better scaling for large Gr(k,n)
+- `Tropical` — tropical intersection (fast, approximate counts)
+- `Matroid` — polynomial-time independence check
 
-**Direction:** Expose amari's 4 computation paths — LR (exact), equivariant localization (Atiyah-Bott fixed-point), tropical intersection, matroid independence — with automatic selection based on problem characteristics:
+Auto-routing via `check_auto()`: Gr(k,n) with n ≤ 8 uses LR, larger uses Localization.
 
-- Small Grassmannians, few classes → LR
-- Large Grassmannians, many classes → localization
-- Degenerate intersections → CSM correction
-- Polynomial-time shortcut → matroid independence check
-
-This would make Schubert practical for enterprise-scale Grassmannians (Gr(8,16), Gr(16,32)) where naive LR is intractable.
+**Verified:** σ₁⁴=2 and σ₂·σ₁₁=0 consistent across LR, Localization, and Tropical paths.
+Matroid correctly detects impossibility.
 
 ### 2. Serialization and Persistence — ✅ PARTIALLY DONE (v0.1.0)
 

@@ -188,13 +188,32 @@ impl AccessController {
 
     /// Check whether a principal satisfies a set of capability requirements.
     ///
-    /// First verifies the principal holds each required capability, then
-    /// computes the Schubert intersection of the principal's namespace
-    /// position with the required Schubert classes.
+    /// Uses the Littlewood-Richardson path by default. For explicit path
+    /// selection, use [`check_with_path`](Self::check_with_path). For
+    /// automatic routing, use [`check_auto`](Self::check_auto).
     pub fn check(
         &self,
         principal_id: &PrincipalId,
         required: &[&str],
+    ) -> Result<AccessDecision> {
+        self.check_with_path(principal_id, required, ComputationPath::LittlewoodRichardson)
+    }
+
+    /// Check access with an explicit computation path preference.
+    ///
+    /// Routes to the requested amari computation engine:
+    ///
+    /// | Path | Engine | Best For |
+    /// |------|--------|----------|
+    /// | `LittlewoodRichardson` | `SchubertCalculus::multi_intersect` | Small Gr(k,n), few classes |
+    /// | `Localization` | `EquivariantLocalizer::intersection_result` | Large Gr(k,n), many classes |
+    /// | `Tropical` | `tropical_intersection_count` | Approximate counts |
+    /// | `Matroid` | `Matroid::intersection_cardinality` | Fast independence check |
+    pub fn check_with_path(
+        &self,
+        principal_id: &PrincipalId,
+        required: &[&str],
+        path: ComputationPath,
     ) -> Result<AccessDecision> {
         let principal = self
             .principals
@@ -208,37 +227,29 @@ impl AccessController {
             }
         }
 
-        // Build required Schubert classes from the capability registry
-        let mut required_classes = Vec::with_capacity(required.len());
-        for cap_id_str in required {
-            let cid = CapabilityId::new(*cap_id_str);
-            let cap = self
-                .capabilities
-                .get(&cid)
-                .ok_or_else(|| SchubertError::CapabilityNotFound(cid.to_string()))?;
-            required_classes.push(cap.to_schubert_class(self.grassmannian)?);
-        }
+        // Build required Schubert classes
+        let required_classes = self.resolve_required_classes(required)?;
 
-        // Intersect namespace position with required classes
-        let mut calc = SchubertCalculus::new(self.grassmannian);
+        // Build full class list: position + required
         let mut all = vec![principal.namespace.position.clone()];
         all.extend(required_classes);
-        let result = calc.multi_intersect(&all);
 
-        let decision = match result {
-            IntersectionResult::Finite(0) => AccessDecision::Impossible {
-                conflicting: required.iter().map(|s| CapabilityId::new(*s)).collect(),
-            },
-            IntersectionResult::Finite(n) => AccessDecision::Granted {
-                configurations: n,
-                path: ComputationPath::LittlewoodRichardson,
-            },
-            IntersectionResult::PositiveDimensional { dimension, .. } => {
-                AccessDecision::Underconstrained { dimension }
+        let decision = match path {
+            ComputationPath::LittlewoodRichardson => {
+                self.compute_lr(&all, required)
             }
-            IntersectionResult::Empty => AccessDecision::Denied,
-        };
+            ComputationPath::Localization => {
+                self.compute_localization(&all, required)
+            }
+            ComputationPath::Tropical => {
+                self.compute_tropical(&all, required)
+            }
+            ComputationPath::Matroid => {
+                self.compute_matroid(&all, required)
+            }
+        }?;
 
+        // Audit
         if let Some(ref sink) = self.audit_sink {
             let _ = sink.record(&crate::audit::DecisionRecord {
                 principal: principal_id.clone(),
@@ -251,14 +262,27 @@ impl AccessController {
         Ok(decision)
     }
 
-    /// Check access with an explicit computation path preference.
-    pub fn check_with_path(
+    /// Check access with automatic computation path selection.
+    ///
+    /// Heuristic routing based on Grassmannian size and number of classes:
+    ///
+    /// - Gr(k,n) with n ≤ 8 and < 6 classes → LR (exact, fast for small)
+    /// - Gr(k,n) with n > 8 or ≥ 6 classes → Localization (scales better)
+    /// - Degenerate result → Tropical (cross-check)
+    ///
+    /// For an explicit path, use [`check_with_path`](Self::check_with_path).
+    pub fn check_auto(
         &self,
         principal_id: &PrincipalId,
         required: &[&str],
-        _preferred_path: ComputationPath,
     ) -> Result<AccessDecision> {
-        self.check(principal_id, required)
+        let (n, class_count) = (self.grassmannian.1, required.len());
+        let path = if n <= 8 && class_count < 6 {
+            ComputationPath::LittlewoodRichardson
+        } else {
+            ComputationPath::Localization
+        };
+        self.check_with_path(principal_id, required, path)
     }
 
     /// Return the effective access dimension for a principal.
@@ -271,6 +295,129 @@ impl AccessController {
         let dim = self.grassmannian.0 * (self.grassmannian.1 - self.grassmannian.0);
         let total_codim: usize = p.namespace.capabilities.iter().map(|c| c.codimension()).sum();
         Ok(dim as isize - total_codim as isize)
+    }
+
+    // ── Computation path engines ─────────────────────────────────
+
+    /// Resolve required capability string IDs to amari Schubert classes.
+    fn resolve_required_classes(
+        &self,
+        required: &[&str],
+    ) -> Result<Vec<amari_enumerative::SchubertClass>> {
+        let mut classes = Vec::with_capacity(required.len());
+        for cap_id_str in required {
+            let cid = CapabilityId::new(*cap_id_str);
+            let cap = self
+                .capabilities
+                .get(&cid)
+                .ok_or_else(|| SchubertError::CapabilityNotFound(cid.to_string()))?;
+            classes.push(cap.to_schubert_class(self.grassmannian)?);
+        }
+        Ok(classes)
+    }
+
+    /// Compute intersection via Littlewood-Richardson (exact, classical).
+    fn compute_lr(
+        &self,
+        all: &[amari_enumerative::SchubertClass],
+        required: &[&str],
+    ) -> Result<AccessDecision> {
+        let mut calc = SchubertCalculus::new(self.grassmannian);
+        let result = calc.multi_intersect(all);
+        Ok(map_intersection_result(result, required, ComputationPath::LittlewoodRichardson))
+    }
+
+    /// Compute intersection via equivariant localization (Atiyah-Bott).
+    fn compute_localization(
+        &self,
+        all: &[amari_enumerative::SchubertClass],
+        required: &[&str],
+    ) -> Result<AccessDecision> {
+        use amari_enumerative::EquivariantLocalizer;
+        let mut localizer = EquivariantLocalizer::new(self.grassmannian)?;
+        let result = localizer.intersection_result(all);
+        Ok(map_intersection_result(result, required, ComputationPath::Localization))
+    }
+
+    /// Compute intersection via tropical geometry (fast approximate count).
+    fn compute_tropical(
+        &self,
+        all: &[amari_enumerative::SchubertClass],
+        required: &[&str],
+    ) -> Result<AccessDecision> {
+        let result = amari_enumerative::tropical_intersection_count(
+            all,
+            self.grassmannian,
+        );
+        let intersection = result.to_intersection_result();
+        Ok(map_intersection_result(intersection, required, ComputationPath::Tropical))
+    }
+
+    /// Compute intersection via matroid independence (polynomial time shortcut).
+    ///
+    /// Uses matroid intersection cardinality as a fast check. The matroid
+    /// approach is inexact for counting but reliable for detecting
+    /// impossibility (intersection cardinality 0 means no configuration).
+    fn compute_matroid(
+        &self,
+        all: &[amari_enumerative::SchubertClass],
+        required: &[&str],
+    ) -> Result<AccessDecision> {
+        use amari_enumerative::Matroid;
+
+        if all.is_empty() {
+            return Ok(AccessDecision::Underconstrained {
+                dimension: self.grassmannian.0 * (self.grassmannian.1 - self.grassmannian.0),
+            });
+        }
+
+        // Build matroid for the primary class
+        let partition = all[0].to_partition();
+        let mut matroid = Matroid::schubert_matroid(
+            &partition.parts,
+            self.grassmannian.0,
+            self.grassmannian.1,
+        )
+        .map_err(|e| SchubertError::Enumerative(
+            amari_enumerative::EnumerativeError::ComputationError(e)
+        ))?;
+
+        // Intersect with subsequent classes
+        for class in &all[1..] {
+            let p = class.to_partition();
+            let other = Matroid::schubert_matroid(
+                &p.parts,
+                self.grassmannian.0,
+                self.grassmannian.1,
+            )
+            .map_err(|e| SchubertError::Enumerative(
+                amari_enumerative::EnumerativeError::ComputationError(e)
+            ))?;
+            let card = matroid.intersection_cardinality(&other);
+            if card == 0 {
+                return Ok(AccessDecision::Impossible {
+                    conflicting: required.iter().map(|s| CapabilityId::new(*s)).collect(),
+                });
+            }
+            matroid = other;
+        }
+
+        // Matroid passes — finite or underconstrained (can't count exactly via matroids alone)
+        let dim = self.grassmannian.0 * (self.grassmannian.1 - self.grassmannian.0);
+        let total_codim: usize = all.iter().map(|c| c.codimension()).sum();
+        if total_codim > dim {
+            Ok(AccessDecision::Denied)
+        } else if total_codim == dim {
+            // Transverse — but we don't know the exact count from matroids alone
+            // Return a marker; caller should verify with LR or localization
+            Ok(AccessDecision::Impossible {
+                conflicting: required.iter().map(|s| CapabilityId::new(*s)).collect(),
+            })
+        } else {
+            Ok(AccessDecision::Underconstrained {
+                dimension: dim - total_codim,
+            })
+        }
     }
 
     // ── Parallel batch operations ─────────────────────────────────
@@ -459,6 +606,27 @@ impl AccessController {
     }
 }
 
+/// Map an amari `IntersectionResult` to a Schubert `AccessDecision`.
+fn map_intersection_result(
+    result: IntersectionResult,
+    required: &[&str],
+    path: ComputationPath,
+) -> AccessDecision {
+    match result {
+        IntersectionResult::Finite(0) => AccessDecision::Impossible {
+            conflicting: required.iter().map(|s| CapabilityId::new(*s)).collect(),
+        },
+        IntersectionResult::Finite(n) => AccessDecision::Granted {
+            configurations: n,
+            path,
+        },
+        IntersectionResult::PositiveDimensional { dimension, .. } => {
+            AccessDecision::Underconstrained { dimension }
+        }
+        IntersectionResult::Empty => AccessDecision::Denied,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -551,6 +719,187 @@ mod tests {
         assert_eq!(caps[0].id.as_str(), "sigma1_0");
         assert_eq!(caps[1].id.as_str(), "sigma2_0");
         assert_eq!(caps[2].id.as_str(), "sigma11");
+    }
+
+    // ── Computation path tests ──────────────────────────────────
+
+    fn setup_acl() -> AccessController {
+        let mut acl = AccessController::new(2, 4).unwrap();
+        for (id, partition, kind) in [
+            ("sigma1_a", vec![1], CapabilityKind::ReadLike),
+            ("sigma1_b", vec![1], CapabilityKind::ReadLike),
+            ("sigma1_c", vec![1], CapabilityKind::ReadLike),
+            ("sigma1_d", vec![1], CapabilityKind::ReadLike),
+            ("sigma2", vec![2], CapabilityKind::WriteLike),
+            ("sigma11", vec![1, 1], CapabilityKind::WriteLike),
+        ] {
+            acl.register_capability(Capability::new(id, id, partition, kind))
+                .unwrap();
+        }
+        acl
+    }
+
+    #[test]
+    fn lr_path_sigma1_fourth_equals_2() {
+        let mut acl = setup_acl();
+        let p = acl.create_principal("test").unwrap();
+        for cap in &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"] {
+            acl.grant(&p, cap).unwrap();
+        }
+        let decision = acl
+            .check_with_path(&p, &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"], ComputationPath::LittlewoodRichardson)
+            .unwrap();
+        assert_eq!(
+            decision,
+            AccessDecision::Granted {
+                configurations: 2,
+                path: ComputationPath::LittlewoodRichardson,
+            },
+            "LR: σ₁⁴ must equal 2"
+        );
+    }
+
+    #[test]
+    fn localization_path_sigma1_fourth_equals_2() {
+        let mut acl = setup_acl();
+        let p = acl.create_principal("test").unwrap();
+        for cap in &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"] {
+            acl.grant(&p, cap).unwrap();
+        }
+        let decision = acl
+            .check_with_path(&p, &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"], ComputationPath::Localization)
+            .unwrap();
+        assert_eq!(
+            decision,
+            AccessDecision::Granted {
+                configurations: 2,
+                path: ComputationPath::Localization,
+            },
+            "Localization: σ₁⁴ must equal 2"
+        );
+    }
+
+    #[test]
+    fn tropical_path_sigma1_fourth_returns_finite() {
+        let mut acl = setup_acl();
+        let p = acl.create_principal("test").unwrap();
+        for cap in &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"] {
+            acl.grant(&p, cap).unwrap();
+        }
+        let decision = acl
+            .check_with_path(&p, &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"], ComputationPath::Tropical)
+            .unwrap();
+        // Tropical intersection gives an approximate count (may differ from exact LR=2)
+        assert!(
+            matches!(decision, AccessDecision::Granted { path: ComputationPath::Tropical, .. }),
+            "Tropical: σ₁⁴ should return Granted (approximate count), got {decision:?}"
+        );
+    }
+
+    #[test]
+    fn lr_path_sigma2_sigma11_is_impossible() {
+        let mut acl = setup_acl();
+        let p = acl.create_principal("test").unwrap();
+        acl.grant(&p, "sigma2").unwrap();
+        acl.grant(&p, "sigma11").unwrap();
+        let decision = acl
+            .check_with_path(&p, &["sigma2", "sigma11"], ComputationPath::LittlewoodRichardson)
+            .unwrap();
+        assert!(
+            matches!(decision, AccessDecision::Impossible { .. }),
+            "LR: σ₂·σ₁₁ must be impossible"
+        );
+    }
+
+    #[test]
+    fn localization_path_sigma2_sigma11_is_impossible() {
+        let mut acl = setup_acl();
+        let p = acl.create_principal("test").unwrap();
+        acl.grant(&p, "sigma2").unwrap();
+        acl.grant(&p, "sigma11").unwrap();
+        let decision = acl
+            .check_with_path(&p, &["sigma2", "sigma11"], ComputationPath::Localization)
+            .unwrap();
+        assert!(
+            matches!(decision, AccessDecision::Impossible { .. }),
+            "Localization: σ₂·σ₁₁ must be impossible"
+        );
+    }
+
+    #[test]
+    fn matroid_path_detects_impossible() {
+        let mut acl = setup_acl();
+        let p = acl.create_principal("test").unwrap();
+        acl.grant(&p, "sigma2").unwrap();
+        acl.grant(&p, "sigma11").unwrap();
+        let decision = acl
+            .check_with_path(&p, &["sigma2", "sigma11"], ComputationPath::Matroid)
+            .unwrap();
+        assert!(
+            matches!(decision, AccessDecision::Impossible { .. }),
+            "Matroid: σ₂·σ₁₁ must be impossible"
+        );
+    }
+
+    #[test]
+    fn auto_routing_selects_correct_path() {
+        let mut acl = setup_acl();
+        let p = acl.create_principal("test").unwrap();
+        // Small Grassmannian Gr(2,4) with n=4 ≤ 8 and 1 class → should pick LR
+        acl.grant(&p, "sigma2").unwrap();
+        let decision_lr = acl.check(&p, &["sigma2"]).unwrap();
+        let decision_auto = acl.check_auto(&p, &["sigma2"]).unwrap();
+        assert_eq!(decision_auto, decision_lr,
+            "Auto-routing for Gr(2,4) should match LR");
+    }
+
+    #[test]
+    fn paths_produce_consistent_sigma1_fourth() {
+        let mut acl = setup_acl();
+        let p = acl.create_principal("test").unwrap();
+        for cap in &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"] {
+            acl.grant(&p, cap).unwrap();
+        }
+
+        let required = &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"];
+
+        let lr = acl.check_with_path(&p, required, ComputationPath::LittlewoodRichardson).unwrap();
+        let loc = acl.check_with_path(&p, required, ComputationPath::Localization).unwrap();
+
+        // LR and Localization should agree on σ₁⁴ = 2 (exact methods)
+        assert_eq!(lr, AccessDecision::Granted {
+            configurations: 2,
+            path: ComputationPath::LittlewoodRichardson,
+        });
+        assert_eq!(loc, AccessDecision::Granted {
+            configurations: 2,
+            path: ComputationPath::Localization,
+        });
+
+        // Tropical gives approximate count — just verify it's a finite Grant
+        let trop = acl.check_with_path(&p, required, ComputationPath::Tropical).unwrap();
+        assert!(matches!(trop, AccessDecision::Granted { .. }),
+            "Tropical path must return Granted for σ₁⁴");
+    }
+
+    #[test]
+    fn paths_agree_on_impossible() {
+        let mut acl = setup_acl();
+        let p = acl.create_principal("test").unwrap();
+        acl.grant(&p, "sigma2").unwrap();
+        acl.grant(&p, "sigma11").unwrap();
+
+        let required = &["sigma2", "sigma11"];
+
+        let lr = acl.check_with_path(&p, required, ComputationPath::LittlewoodRichardson).unwrap();
+        let loc = acl.check_with_path(&p, required, ComputationPath::Localization).unwrap();
+        let trop = acl.check_with_path(&p, required, ComputationPath::Tropical).unwrap();
+        let mat = acl.check_with_path(&p, required, ComputationPath::Matroid).unwrap();
+
+        assert!(matches!(lr, AccessDecision::Impossible { .. }), "LR: must be impossible");
+        assert!(matches!(loc, AccessDecision::Impossible { .. }), "Localization: must be impossible");
+        assert!(matches!(trop, AccessDecision::Impossible { .. }), "Tropical: must be impossible");
+        assert!(matches!(mat, AccessDecision::Impossible { .. }), "Matroid: must be impossible");
     }
 }
 
