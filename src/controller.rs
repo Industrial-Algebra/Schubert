@@ -6,13 +6,13 @@ use crate::capability::{Capability, CapabilityId};
 use crate::decision::{AccessDecision, ComputationPath};
 use crate::error::{Result, SchubertError};
 use crate::principal::{Principal, PrincipalId};
-use amari_enumerative::{IntersectionResult, SchubertCalculus};
-#[cfg(feature = "std")]
-use std::collections::HashMap;
 #[cfg(not(feature = "std"))]
 use alloc::collections::BTreeMap as HashMap;
+use amari_enumerative::{IntersectionResult, SchubertCalculus};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
+#[cfg(feature = "std")]
+use std::collections::HashMap;
 
 /// Access controller for quantitative capability-based authorization.
 ///
@@ -50,7 +50,8 @@ impl AccessController {
     pub fn new(k: usize, n: usize) -> Result<Self> {
         if k == 0 || n < 2 || k >= n {
             return Err(SchubertError::InvalidGrassmannian {
-                k, n,
+                k,
+                n,
                 reason: "require k ≥ 1, n ≥ 2, k < n".into(),
             });
         }
@@ -63,13 +64,17 @@ impl AccessController {
     }
 
     /// Return the Grassmannian parameters Gr(k,n).
-    pub fn grassmannian(&self) -> (usize, usize) { self.grassmannian }
+    pub fn grassmannian(&self) -> (usize, usize) {
+        self.grassmannian
+    }
 
     /// Install an audit sink for recording access decisions.
     ///
     /// The sink receives every decision made by [`check`](Self::check).
     /// Audit failures are silently ignored — they never affect access decisions.
-    pub fn set_audit_sink(&mut self, sink: Box<dyn AuditSink>) { self.audit_sink = Some(sink); }
+    pub fn set_audit_sink(&mut self, sink: Box<dyn AuditSink>) {
+        self.audit_sink = Some(sink);
+    }
 
     // ── Capability registry ────────────────────────────────────────
 
@@ -137,13 +142,15 @@ impl AccessController {
         .map_err(SchubertError::Enumerative)?;
 
         principal.namespace.grant(amari_cap).map_err(|e| {
-            SchubertError::Enumerative(
-                amari_enumerative::EnumerativeError::SchubertError(e.to_string()),
-            )
+            SchubertError::Enumerative(amari_enumerative::EnumerativeError::SchubertError(
+                e.to_string(),
+            ))
         })?;
 
         // Track grant for serialization roundtrip
-        principal.granted_capability_ids.push(capability_id.to_string());
+        principal
+            .granted_capability_ids
+            .push(capability_id.to_string());
 
         Ok(())
     }
@@ -164,7 +171,9 @@ impl AccessController {
         }
 
         principal.namespace.revoke(&amari_cid);
-        principal.granted_capability_ids.retain(|id| id != capability_id);
+        principal
+            .granted_capability_ids
+            .retain(|id| id != capability_id);
         Ok(())
     }
 
@@ -197,12 +206,12 @@ impl AccessController {
     /// Uses the Littlewood-Richardson path by default. For explicit path
     /// selection, use [`check_with_path`](Self::check_with_path). For
     /// automatic routing, use [`check_auto`](Self::check_auto).
-    pub fn check(
-        &self,
-        principal_id: &PrincipalId,
-        required: &[&str],
-    ) -> Result<AccessDecision> {
-        self.check_with_path(principal_id, required, ComputationPath::LittlewoodRichardson)
+    pub fn check(&self, principal_id: &PrincipalId, required: &[&str]) -> Result<AccessDecision> {
+        self.check_with_path(
+            principal_id,
+            required,
+            ComputationPath::LittlewoodRichardson,
+        )
     }
 
     /// Check access with an explicit computation path preference.
@@ -241,18 +250,10 @@ impl AccessController {
         all.extend(required_classes);
 
         let decision = match path {
-            ComputationPath::LittlewoodRichardson => {
-                self.compute_lr(&all, required)
-            }
-            ComputationPath::Localization => {
-                self.compute_localization(&all, required)
-            }
-            ComputationPath::Tropical => {
-                self.compute_tropical(&all, required)
-            }
-            ComputationPath::Matroid => {
-                self.compute_matroid(&all, required)
-            }
+            ComputationPath::LittlewoodRichardson => self.compute_lr(&all, required),
+            ComputationPath::Localization => self.compute_localization(&all, required),
+            ComputationPath::Tropical => self.compute_tropical(&all, required),
+            ComputationPath::Matroid => self.compute_matroid(&all, required),
         }?;
 
         // Audit
@@ -299,7 +300,12 @@ impl AccessController {
             .ok_or_else(|| SchubertError::PrincipalNotFound(principal_id.to_string()))?;
 
         let dim = self.grassmannian.0 * (self.grassmannian.1 - self.grassmannian.0);
-        let total_codim: usize = p.namespace.capabilities.iter().map(|c| c.codimension()).sum();
+        let total_codim: usize = p
+            .namespace
+            .capabilities
+            .iter()
+            .map(|c| c.codimension())
+            .sum();
         Ok(dim as isize - total_codim as isize)
     }
 
@@ -330,7 +336,11 @@ impl AccessController {
     ) -> Result<AccessDecision> {
         let mut calc = SchubertCalculus::new(self.grassmannian);
         let result = calc.multi_intersect(all);
-        Ok(map_intersection_result(result, required, ComputationPath::LittlewoodRichardson))
+        Ok(map_intersection_result(
+            result,
+            required,
+            ComputationPath::LittlewoodRichardson,
+        ))
     }
 
     /// Compute intersection via equivariant localization (Atiyah-Bott).
@@ -342,7 +352,11 @@ impl AccessController {
         use amari_enumerative::EquivariantLocalizer;
         let mut localizer = EquivariantLocalizer::new(self.grassmannian)?;
         let result = localizer.intersection_result(all);
-        Ok(map_intersection_result(result, required, ComputationPath::Localization))
+        Ok(map_intersection_result(
+            result,
+            required,
+            ComputationPath::Localization,
+        ))
     }
 
     /// Compute intersection via tropical geometry (fast approximate count).
@@ -351,12 +365,13 @@ impl AccessController {
         all: &[amari_enumerative::SchubertClass],
         required: &[&str],
     ) -> Result<AccessDecision> {
-        let result = amari_enumerative::tropical_intersection_count(
-            all,
-            self.grassmannian,
-        );
+        let result = amari_enumerative::tropical_intersection_count(all, self.grassmannian);
         let intersection = result.to_intersection_result();
-        Ok(map_intersection_result(intersection, required, ComputationPath::Tropical))
+        Ok(map_intersection_result(
+            intersection,
+            required,
+            ComputationPath::Tropical,
+        ))
     }
 
     /// Compute intersection via matroid independence (polynomial time shortcut).
@@ -379,26 +394,22 @@ impl AccessController {
 
         // Build matroid for the primary class
         let partition = all[0].to_partition();
-        let mut matroid = Matroid::schubert_matroid(
-            &partition.parts,
-            self.grassmannian.0,
-            self.grassmannian.1,
-        )
-        .map_err(|e| SchubertError::Enumerative(
-            amari_enumerative::EnumerativeError::ComputationError(e)
-        ))?;
+        let mut matroid =
+            Matroid::schubert_matroid(&partition.parts, self.grassmannian.0, self.grassmannian.1)
+                .map_err(|e| {
+                SchubertError::Enumerative(amari_enumerative::EnumerativeError::ComputationError(e))
+            })?;
 
         // Intersect with subsequent classes
         for class in &all[1..] {
             let p = class.to_partition();
-            let other = Matroid::schubert_matroid(
-                &p.parts,
-                self.grassmannian.0,
-                self.grassmannian.1,
-            )
-            .map_err(|e| SchubertError::Enumerative(
-                amari_enumerative::EnumerativeError::ComputationError(e)
-            ))?;
+            let other =
+                Matroid::schubert_matroid(&p.parts, self.grassmannian.0, self.grassmannian.1)
+                    .map_err(|e| {
+                        SchubertError::Enumerative(
+                            amari_enumerative::EnumerativeError::ComputationError(e),
+                        )
+                    })?;
             let card = matroid.intersection_cardinality(&other);
             if card == 0 {
                 return Ok(AccessDecision::Impossible {
@@ -443,10 +454,7 @@ impl AccessController {
     /// # }
     /// ```
     #[cfg(feature = "parallel")]
-    pub fn check_batch(
-        &self,
-        queries: &[(&PrincipalId, &[&str])],
-    ) -> Vec<Result<AccessDecision>> {
+    pub fn check_batch(&self, queries: &[(&PrincipalId, &[&str])]) -> Vec<Result<AccessDecision>> {
         use amari_enumerative::multi_intersect_batch;
 
         // Gather all valid queries; track denied ones separately
@@ -515,7 +523,7 @@ impl AccessController {
 
             let batch_results = multi_intersect_batch(&inputs);
 
-            for (q, result) in valid.into_iter().zip(batch_results.into_iter()) {
+            for (q, result) in valid.into_iter().zip(batch_results) {
                 let decision = match result {
                     IntersectionResult::Finite(0) => AccessDecision::Impossible {
                         conflicting: q.required_strs.into_iter().map(CapabilityId::new).collect(),
@@ -644,9 +652,9 @@ impl AccessController {
                 .map_err(SchubertError::Enumerative)?;
 
                 principal.namespace.grant(amari_cap).map_err(|e| {
-                    SchubertError::Enumerative(
-                        amari_enumerative::EnumerativeError::SchubertError(e.to_string()),
-                    )
+                    SchubertError::Enumerative(amari_enumerative::EnumerativeError::SchubertError(
+                        e.to_string(),
+                    ))
                 })?;
             }
         }
@@ -668,8 +676,7 @@ impl AccessController {
     /// Save the controller state to a file.
     #[cfg(all(feature = "serde", feature = "std"))]
     pub fn save_to_file(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
-        let json = serde_json::to_string_pretty(self)
-            .map_err(std::io::Error::other)?;
+        let json = serde_json::to_string_pretty(self).map_err(std::io::Error::other)?;
         std::fs::write(path, json)
     }
 
@@ -683,7 +690,7 @@ impl AccessController {
 }
 
 /// Map an amari `IntersectionResult` to a Schubert `AccessDecision`.
-fn map_intersection_result(
+pub(crate) fn map_intersection_result(
     result: IntersectionResult,
     required: &[&str],
     path: ComputationPath,
@@ -709,7 +716,10 @@ fn map_intersection_result(
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for AccessController {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
         let mut state = serializer.serialize_struct("AccessController", 3)?;
         state.serialize_field("grassmannian", &self.grassmannian)?;
@@ -717,10 +727,7 @@ impl serde::Serialize for AccessController {
             "capabilities",
             &self.capabilities.values().collect::<Vec<_>>(),
         )?;
-        state.serialize_field(
-            "principals",
-            &self.principals.values().collect::<Vec<_>>(),
-        )?;
+        state.serialize_field("principals", &self.principals.values().collect::<Vec<_>>())?;
         state.end()
     }
 }
@@ -757,7 +764,9 @@ impl<'de> serde::Deserialize<'de> for AccessController {
             controller.capabilities.insert(cap.id.clone(), cap);
         }
         for principal in data.principals {
-            controller.principals.insert(principal.id.clone(), principal);
+            controller
+                .principals
+                .insert(principal.id.clone(), principal);
         }
 
         controller
@@ -803,7 +812,10 @@ mod tests {
             .unwrap();
         assert_eq!(
             decision,
-            AccessDecision::Granted { configurations: 2, path: ComputationPath::LittlewoodRichardson },
+            AccessDecision::Granted {
+                configurations: 2,
+                path: ComputationPath::LittlewoodRichardson
+            },
             "σ₁⁴ must equal 2 in Gr(2,4)"
         );
     }
@@ -815,8 +827,10 @@ mod tests {
         acl.grant(&p, "sigma2_0").unwrap();
         acl.grant(&p, "sigma11").unwrap();
         let decision = acl.check(&p, &["sigma2_0", "sigma11"]).unwrap();
-        assert!(matches!(decision, AccessDecision::Impossible { .. }),
-            "σ₂·σ₁₁ must be impossible, got {decision:?}");
+        assert!(
+            matches!(decision, AccessDecision::Impossible { .. }),
+            "σ₂·σ₁₁ must be impossible, got {decision:?}"
+        );
     }
 
     #[test]
@@ -888,7 +902,11 @@ mod tests {
             acl.grant(&p, cap).unwrap();
         }
         let decision = acl
-            .check_with_path(&p, &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"], ComputationPath::LittlewoodRichardson)
+            .check_with_path(
+                &p,
+                &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"],
+                ComputationPath::LittlewoodRichardson,
+            )
             .unwrap();
         assert_eq!(
             decision,
@@ -908,7 +926,11 @@ mod tests {
             acl.grant(&p, cap).unwrap();
         }
         let decision = acl
-            .check_with_path(&p, &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"], ComputationPath::Localization)
+            .check_with_path(
+                &p,
+                &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"],
+                ComputationPath::Localization,
+            )
             .unwrap();
         assert_eq!(
             decision,
@@ -928,11 +950,21 @@ mod tests {
             acl.grant(&p, cap).unwrap();
         }
         let decision = acl
-            .check_with_path(&p, &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"], ComputationPath::Tropical)
+            .check_with_path(
+                &p,
+                &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"],
+                ComputationPath::Tropical,
+            )
             .unwrap();
         // Tropical intersection gives an approximate count (may differ from exact LR=2)
         assert!(
-            matches!(decision, AccessDecision::Granted { path: ComputationPath::Tropical, .. }),
+            matches!(
+                decision,
+                AccessDecision::Granted {
+                    path: ComputationPath::Tropical,
+                    ..
+                }
+            ),
             "Tropical: σ₁⁴ should return Granted (approximate count), got {decision:?}"
         );
     }
@@ -944,7 +976,11 @@ mod tests {
         acl.grant(&p, "sigma2").unwrap();
         acl.grant(&p, "sigma11").unwrap();
         let decision = acl
-            .check_with_path(&p, &["sigma2", "sigma11"], ComputationPath::LittlewoodRichardson)
+            .check_with_path(
+                &p,
+                &["sigma2", "sigma11"],
+                ComputationPath::LittlewoodRichardson,
+            )
             .unwrap();
         assert!(
             matches!(decision, AccessDecision::Impossible { .. }),
@@ -990,8 +1026,10 @@ mod tests {
         acl.grant(&p, "sigma2").unwrap();
         let decision_lr = acl.check(&p, &["sigma2"]).unwrap();
         let decision_auto = acl.check_auto(&p, &["sigma2"]).unwrap();
-        assert_eq!(decision_auto, decision_lr,
-            "Auto-routing for Gr(2,4) should match LR");
+        assert_eq!(
+            decision_auto, decision_lr,
+            "Auto-routing for Gr(2,4) should match LR"
+        );
     }
 
     #[test]
@@ -1004,23 +1042,37 @@ mod tests {
 
         let required = &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"];
 
-        let lr = acl.check_with_path(&p, required, ComputationPath::LittlewoodRichardson).unwrap();
-        let loc = acl.check_with_path(&p, required, ComputationPath::Localization).unwrap();
+        let lr = acl
+            .check_with_path(&p, required, ComputationPath::LittlewoodRichardson)
+            .unwrap();
+        let loc = acl
+            .check_with_path(&p, required, ComputationPath::Localization)
+            .unwrap();
 
         // LR and Localization should agree on σ₁⁴ = 2 (exact methods)
-        assert_eq!(lr, AccessDecision::Granted {
-            configurations: 2,
-            path: ComputationPath::LittlewoodRichardson,
-        });
-        assert_eq!(loc, AccessDecision::Granted {
-            configurations: 2,
-            path: ComputationPath::Localization,
-        });
+        assert_eq!(
+            lr,
+            AccessDecision::Granted {
+                configurations: 2,
+                path: ComputationPath::LittlewoodRichardson,
+            }
+        );
+        assert_eq!(
+            loc,
+            AccessDecision::Granted {
+                configurations: 2,
+                path: ComputationPath::Localization,
+            }
+        );
 
         // Tropical gives approximate count — just verify it's a finite Grant
-        let trop = acl.check_with_path(&p, required, ComputationPath::Tropical).unwrap();
-        assert!(matches!(trop, AccessDecision::Granted { .. }),
-            "Tropical path must return Granted for σ₁⁴");
+        let trop = acl
+            .check_with_path(&p, required, ComputationPath::Tropical)
+            .unwrap();
+        assert!(
+            matches!(trop, AccessDecision::Granted { .. }),
+            "Tropical path must return Granted for σ₁⁴"
+        );
     }
 
     #[test]
@@ -1032,15 +1084,35 @@ mod tests {
 
         let required = &["sigma2", "sigma11"];
 
-        let lr = acl.check_with_path(&p, required, ComputationPath::LittlewoodRichardson).unwrap();
-        let loc = acl.check_with_path(&p, required, ComputationPath::Localization).unwrap();
-        let trop = acl.check_with_path(&p, required, ComputationPath::Tropical).unwrap();
-        let mat = acl.check_with_path(&p, required, ComputationPath::Matroid).unwrap();
+        let lr = acl
+            .check_with_path(&p, required, ComputationPath::LittlewoodRichardson)
+            .unwrap();
+        let loc = acl
+            .check_with_path(&p, required, ComputationPath::Localization)
+            .unwrap();
+        let trop = acl
+            .check_with_path(&p, required, ComputationPath::Tropical)
+            .unwrap();
+        let mat = acl
+            .check_with_path(&p, required, ComputationPath::Matroid)
+            .unwrap();
 
-        assert!(matches!(lr, AccessDecision::Impossible { .. }), "LR: must be impossible");
-        assert!(matches!(loc, AccessDecision::Impossible { .. }), "Localization: must be impossible");
-        assert!(matches!(trop, AccessDecision::Impossible { .. }), "Tropical: must be impossible");
-        assert!(matches!(mat, AccessDecision::Impossible { .. }), "Matroid: must be impossible");
+        assert!(
+            matches!(lr, AccessDecision::Impossible { .. }),
+            "LR: must be impossible"
+        );
+        assert!(
+            matches!(loc, AccessDecision::Impossible { .. }),
+            "Localization: must be impossible"
+        );
+        assert!(
+            matches!(trop, AccessDecision::Impossible { .. }),
+            "Tropical: must be impossible"
+        );
+        assert!(
+            matches!(mat, AccessDecision::Impossible { .. }),
+            "Matroid: must be impossible"
+        );
     }
 }
 
@@ -1112,8 +1184,8 @@ mod parallel_tests {
         // Bob has no sigma2
 
         let queries: &[(&PrincipalId, &[&str])] = &[
-            (&p1, &["sigma22"]),   // granted: point class = 1 config
-            (&p2, &["sigma2"]),    // denied: bob doesn't hold sigma2
+            (&p1, &["sigma22"]), // granted: point class = 1 config
+            (&p2, &["sigma2"]),  // denied: bob doesn't hold sigma2
         ];
 
         let results = acl.check_batch(queries);
@@ -1160,14 +1232,13 @@ mod parallel_tests {
         let p2 = acl.create_principal("consumer").unwrap();
         // Both principals hold sigma1_a — that's the shared interface
         acl.grant(&p1, "sigma1_a").unwrap();
-        acl.grant(&p1, "sigma2").unwrap();  // extra cap on producer
+        acl.grant(&p1, "sigma2").unwrap(); // extra cap on producer
         acl.grant(&p2, "sigma1_a").unwrap();
         acl.grant(&p2, "sigma1_b").unwrap(); // extra cap on consumer
 
         // Compose via the shared sigma1_a interface
-        let pairs: &[(&PrincipalId, &str, &PrincipalId, &str)] = &[
-            (&p1, "sigma1_a", &p2, "sigma1_a"),
-        ];
+        let pairs: &[(&PrincipalId, &str, &PrincipalId, &str)] =
+            &[(&p1, "sigma1_a", &p2, "sigma1_a")];
 
         let results = acl.compose_batch(pairs);
         assert_eq!(results.len(), 1);
@@ -1175,7 +1246,9 @@ mod parallel_tests {
         assert!(result.multiplicity > 0);
         // Retained: sigma2 from p1, sigma1_b from p2 (sigma1_a consumed as interface)
         assert!(result.retained_capabilities.contains(&"sigma2".to_string()));
-        assert!(result.retained_capabilities.contains(&"sigma1_b".to_string()));
+        assert!(result
+            .retained_capabilities
+            .contains(&"sigma1_b".to_string()));
     }
 
     #[test]
@@ -1204,8 +1277,11 @@ mod parallel_tests {
         let par = acl.check_batch(queries);
 
         for (s, p) in seq.iter().zip(par.iter()) {
-            assert_eq!(s.as_ref().unwrap(), p.as_ref().unwrap(),
-                "parallel check_batch must match sequential check");
+            assert_eq!(
+                s.as_ref().unwrap(),
+                p.as_ref().unwrap(),
+                "parallel check_batch must match sequential check"
+            );
         }
     }
 }
@@ -1302,8 +1378,10 @@ mod serde_tests {
             restored.check(&alice, &["admin"]).unwrap(),
         ];
 
-        assert_eq!(before_checks, after_checks,
-            "all access decisions must survive roundtrip");
+        assert_eq!(
+            before_checks, after_checks,
+            "all access decisions must survive roundtrip"
+        );
     }
 
     #[test]
@@ -1313,22 +1391,30 @@ mod serde_tests {
         for i in 0..4 {
             let id = format!("sigma1_{i}");
             acl.register_capability(Capability::new(
-                id.clone(), id.clone(), vec![1], CapabilityKind::ReadLike,
-            )).unwrap();
+                id.clone(),
+                id.clone(),
+                vec![1],
+                CapabilityKind::ReadLike,
+            ))
+            .unwrap();
         }
         let p = acl.create_principal("test").unwrap();
         for i in 0..4 {
             acl.grant(&p, &format!("sigma1_{i}")).unwrap();
         }
 
-        let before = acl.check(&p, &["sigma1_0", "sigma1_1", "sigma1_2", "sigma1_3"]).unwrap();
+        let before = acl
+            .check(&p, &["sigma1_0", "sigma1_1", "sigma1_2", "sigma1_3"])
+            .unwrap();
 
         let json = acl.to_json().unwrap();
         let restored = AccessController::from_json(&json).unwrap();
 
         // Use the same principal ID to look up after restore
         let rp = restored.principal(&p).unwrap();
-        let after = restored.check(&rp.id, &["sigma1_0", "sigma1_1", "sigma1_2", "sigma1_3"]).unwrap();
+        let after = restored
+            .check(&rp.id, &["sigma1_0", "sigma1_1", "sigma1_2", "sigma1_3"])
+            .unwrap();
 
         assert_eq!(before, after, "σ₁⁴=2 must survive roundtrip");
     }
@@ -1337,7 +1423,7 @@ mod serde_tests {
     fn roundtrip_impossible_detected() {
         let mut acl = setup();
         let p = acl.create_principal("test").unwrap();
-        acl.grant(&p, "write").unwrap();   // σ₂
+        acl.grant(&p, "write").unwrap(); // σ₂
         acl.grant(&p, "internal").unwrap(); // σ₁₁
 
         let before = acl.check(&p, &["write", "internal"]).unwrap();
@@ -1348,8 +1434,10 @@ mod serde_tests {
 
         let rp = restored.principal(&p).unwrap();
         let after = restored.check(&rp.id, &["write", "internal"]).unwrap();
-        assert!(matches!(after, AccessDecision::Impossible { .. }),
-            "impossibility detection must survive roundtrip");
+        assert!(
+            matches!(after, AccessDecision::Impossible { .. }),
+            "impossibility detection must survive roundtrip"
+        );
     }
 
     #[test]

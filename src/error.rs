@@ -93,6 +93,10 @@ pub enum SchubertError {
     /// Serialization error from an audit sink.
     #[error("serialization error: {0}")]
     Serialization(String),
+
+    /// Generic error for multi-controller and other operations.
+    #[error("{0}")]
+    Generic(String),
 }
 
 /// Result type alias for Schubert operations.

@@ -53,13 +53,19 @@ impl TrustLevel {
     pub const NONE: Self = Self(0.0);
 
     /// Create a trust level, clamping to [0.0, 1.0].
-    pub fn new(value: f64) -> Self { Self(value.clamp(0.0, 1.0)) }
+    pub fn new(value: f64) -> Self {
+        Self(value.clamp(0.0, 1.0))
+    }
     /// Return the inner f64 value.
-    pub fn value(&self) -> f64 { self.0 }
+    pub fn value(&self) -> f64 {
+        self.0
+    }
 }
 
 impl Default for TrustLevel {
-    fn default() -> Self { Self::FULL }
+    fn default() -> Self {
+        Self::FULL
+    }
 }
 
 /// A breakpoint in the stability phase diagram.
@@ -128,7 +134,8 @@ pub fn analyze_stability(
     acl: &AccessController,
     principal_id: &PrincipalId,
 ) -> Result<StabilityReport> {
-    let principal = acl.principal(principal_id)
+    let principal = acl
+        .principal(principal_id)
         .ok_or_else(|| SchubertError::PrincipalNotFound(principal_id.to_string()))?;
 
     let engine = WallCrossingEngine::new(acl.grassmannian());
@@ -139,9 +146,15 @@ pub fn analyze_stability(
     let breakpoints: Vec<StabilityBreakpoint> = diagram
         .into_iter()
         .filter_map(|(trust, stable_count)| {
-            if !seen.insert(stable_count) { return None; }
-            let all_ids: Vec<String> = principal.namespace.capabilities.iter()
-                .map(|c| c.id.to_string()).collect();
+            if !seen.insert(stable_count) {
+                return None;
+            }
+            let all_ids: Vec<String> = principal
+                .namespace
+                .capabilities
+                .iter()
+                .map(|c| c.id.to_string())
+                .collect();
             let stable = all_ids.iter().take(stable_count).cloned().collect();
             let unstable: Vec<String> = all_ids.iter().skip(stable_count).cloned().collect();
             Some(StabilityBreakpoint {
@@ -183,13 +196,17 @@ pub fn stable_capabilities_at(
     principal_id: &PrincipalId,
     trust: TrustLevel,
 ) -> Result<Vec<String>> {
-    let principal = acl.principal(principal_id)
+    let principal = acl
+        .principal(principal_id)
         .ok_or_else(|| SchubertError::PrincipalNotFound(principal_id.to_string()))?;
 
     let condition = StabilityCondition::standard(acl.grassmannian(), trust.value());
     let count = condition.stable_count(&principal.namespace);
 
-    Ok(principal.namespace.capabilities.iter()
+    Ok(principal
+        .namespace
+        .capabilities
+        .iter()
         .take(count)
         .map(|c| c.id.to_string())
         .collect())

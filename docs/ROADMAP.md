@@ -96,11 +96,20 @@ The context feeds into the stability engine — certain capabilities may be cond
 
 ## Medium-Term (Research-Adjacent)
 
-### 6. Multi-Grassmannian Controllers
+### 6. Multi-Grassmannian Controllers — ✅ DONE (v0.1.0)
 
-**Current:** One `AccessController` = one Grassmannian Gr(k,n). Cross-domain access requires multiple controllers.
+**Implemented:** `MultiController` managing multiple Grassmannian domains:
+- `add_domain(k, n)` / `add_domain_named(k, n, label)` — register domains
+- `create_principal()`, `grant_in_domain()`, `register_in_domain()` — per-domain ops
+- `check_in_domain()` — standard check within a domain
+- `check_cross_domain()` — translate capabilities between Grassmannians
+  via partition validation (fits-in-box check)
+- `translatable_capabilities()` — list capabilities compatible across domains
+- `domains_for_partition()` — find domains that accept a given partition
 
-**Direction:** A `MultiController` that manages multiple Grassmannians with cross-domain capability translation. A principal in Gr(2,4) accessing a resource in Gr(3,6) requires a morphism between Grassmannians — the Schubert calculus of flag varieties provides this.
+**Verified:** 7 tests (add domains, same-domain check, cross-domain translatable,
+cross-domain check, denied-if-not-held, partition-based domain discovery,
+duplicate label rejection).
 
 ### 7. Proof-Carrying Capabilities — ✅ PARTIALLY DONE (v0.1.0)
 

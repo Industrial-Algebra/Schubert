@@ -140,7 +140,8 @@ impl AuditSink for InMemoryAudit {
         // Note: without std, InMemoryAudit is not thread-safe.
         // This is acceptable for single-threaded no_std environments.
         // SAFETY: In single-threaded no_std, this is safe.
-        let records = &self.records as *const alloc::vec::Vec<DecisionRecord> as *mut alloc::vec::Vec<DecisionRecord>;
+        let records = &self.records as *const alloc::vec::Vec<DecisionRecord>
+            as *mut alloc::vec::Vec<DecisionRecord>;
         unsafe { &mut *records }.push(record.clone());
         Ok(())
     }

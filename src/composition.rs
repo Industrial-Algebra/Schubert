@@ -81,53 +81,74 @@ pub fn compose(
     principal_b: &PrincipalId,
     input_cap: &str,
 ) -> Result<CompositionResult> {
-    let a = acl.principal(principal_a)
+    let a = acl
+        .principal(principal_a)
         .ok_or_else(|| SchubertError::PrincipalNotFound(principal_a.to_string()))?;
-    let b = acl.principal(principal_b)
+    let b = acl
+        .principal(principal_b)
         .ok_or_else(|| SchubertError::PrincipalNotFound(principal_b.to_string()))?;
 
     if !a.holds(output_cap) {
         return Err(SchubertError::CapabilityNotHeld {
-            principal: principal_a.to_string(), capability: output_cap.to_string(),
+            principal: principal_a.to_string(),
+            capability: output_cap.to_string(),
         });
     }
     if !b.holds(input_cap) {
         return Err(SchubertError::CapabilityNotHeld {
-            principal: principal_b.to_string(), capability: input_cap.to_string(),
+            principal: principal_b.to_string(),
+            capability: input_cap.to_string(),
         });
     }
 
-    let output_idx = a.namespace.capabilities.iter()
+    let output_idx = a
+        .namespace
+        .capabilities
+        .iter()
         .position(|c| c.id.as_str() == output_cap)
         .ok_or_else(|| SchubertError::CapabilityNotHeld {
-            principal: principal_a.to_string(), capability: output_cap.to_string(),
+            principal: principal_a.to_string(),
+            capability: output_cap.to_string(),
         })?;
-    let input_idx = b.namespace.capabilities.iter()
+    let input_idx = b
+        .namespace
+        .capabilities
+        .iter()
         .position(|c| c.id.as_str() == input_cap)
         .ok_or_else(|| SchubertError::CapabilityNotHeld {
-            principal: principal_b.to_string(), capability: input_cap.to_string(),
+            principal: principal_b.to_string(),
+            capability: input_cap.to_string(),
         })?;
 
     let mut comp_a = ComposableNamespace::new(a.namespace.clone());
     let mut comp_b = ComposableNamespace::new(b.namespace.clone());
     let amari_out = amari_enumerative::CapabilityId::new(output_cap);
     let amari_in = amari_enumerative::CapabilityId::new(input_cap);
-    comp_a.mark_output(&amari_out)
+    comp_a
+        .mark_output(&amari_out)
         .map_err(SchubertError::CompositionFailed)?;
-    comp_b.mark_input(&amari_in)
+    comp_b
+        .mark_input(&amari_in)
         .map_err(SchubertError::CompositionFailed)?;
 
     let multiplicity = composition_multiplicity(&comp_a, output_idx, &comp_b, input_idx);
 
     let mut retained = Vec::new();
     for (i, cap) in a.namespace.capabilities.iter().enumerate() {
-        if i != output_idx { retained.push(cap.id.to_string()); }
+        if i != output_idx {
+            retained.push(cap.id.to_string());
+        }
     }
     for (i, cap) in b.namespace.capabilities.iter().enumerate() {
-        if i != input_idx { retained.push(cap.id.to_string()); }
+        if i != input_idx {
+            retained.push(cap.id.to_string());
+        }
     }
 
-    Ok(CompositionResult { multiplicity, retained_capabilities: retained })
+    Ok(CompositionResult {
+        multiplicity,
+        retained_capabilities: retained,
+    })
 }
 
 /// Check whether two principals are composable via their interfaces.
@@ -144,8 +165,7 @@ pub fn are_composable(
 ) -> bool {
     let a = acl.principal(principal_a);
     let b = acl.principal(principal_b);
-    a.is_some_and(|a| a.holds(output_cap))
-        && b.is_some_and(|b| b.holds(input_cap))
+    a.is_some_and(|a| a.holds(output_cap)) && b.is_some_and(|b| b.holds(input_cap))
 }
 
 #[cfg(test)]
@@ -162,7 +182,8 @@ mod tests {
             ("keep_a", vec![1], CapabilityKind::ReadLike),
             ("keep_b", vec![1], CapabilityKind::ReadLike),
         ] {
-            acl.register_capability(Capability::new(id, id, partition, kind)).unwrap();
+            acl.register_capability(Capability::new(id, id, partition, kind))
+                .unwrap();
         }
         acl
     }
