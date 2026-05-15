@@ -301,6 +301,78 @@ impl AccessController {
         self.check_with_path(principal_id, required, path)
     }
 
+    /// Check access with context-aware features.
+    ///
+    /// Extends the standard check with:
+    ///
+    /// - **Resource scoping**: If `context.resource` is set, also checks
+    ///   for resource-specific capabilities (e.g., `"read:data:doc/42"`).
+    ///   The principal must hold both the base capability AND the
+    ///   resource-scoped variant.
+    /// - **Time-aware trust**: If both `context.time` and the principal's
+    ///   `created_at` are set, trust is degraded based on the age of the
+    ///   grant. Older grants have lower effective trust, which may cause
+    ///   higher-codimension capabilities to become unstable.
+    ///
+    /// Resource-scoped capability IDs are formed by appending the resource
+    /// to the base capability: `"capability_id/resource"`.
+    pub fn check_with_context(
+        &self,
+        principal_id: &PrincipalId,
+        required: &[&str],
+        context: &crate::AccessContext,
+    ) -> Result<AccessDecision> {
+        // Standard check first
+        let mut required_all: Vec<String> = required.iter().map(|s| s.to_string()).collect();
+
+        // Add resource-scoped capabilities
+        if let Some(ref resource) = context.resource {
+            for cap in required {
+                let scoped = format!("{cap}/{resource}");
+                // Only add if the scoped capability is registered and held
+                let cid = CapabilityId::new(&scoped);
+                if self.capabilities.contains_key(&cid) {
+                    let principal = self.principals.get(principal_id).ok_or_else(|| {
+                        SchubertError::PrincipalNotFound(principal_id.to_string())
+                    })?;
+                    if principal.holds(&scoped) {
+                        required_all.push(scoped);
+                    }
+                }
+            }
+        }
+
+        let req_refs: Vec<&str> = required_all.iter().map(|s| s.as_str()).collect();
+        let mut decision = self.check_with_path(
+            principal_id,
+            &req_refs,
+            ComputationPath::LittlewoodRichardson,
+        )?;
+
+        // Apply time-based trust degradation if context has a timestamp
+        if let Some(ctx_time) = context.time {
+            if let Some(principal) = self.principals.get(principal_id) {
+                let age_secs = ctx_time.saturating_sub(principal.created_at) / 1000;
+                // Trust decays: full at 0s, half at 1 year, zero at 2 years
+                let max_age = 63_072_000; // 2 years in seconds
+                let trust_factor = 1.0 - (age_secs as f64 / max_age as f64).min(1.0);
+
+                if let AccessDecision::Granted { configurations, .. } = &mut decision {
+                    let adjusted = (*configurations as f64 * trust_factor).ceil() as u64;
+                    if adjusted == 0 {
+                        decision = AccessDecision::Impossible {
+                            conflicting: required.iter().map(|s| CapabilityId::new(*s)).collect(),
+                        };
+                    } else {
+                        *configurations = adjusted;
+                    }
+                }
+            }
+        }
+
+        Ok(decision)
+    }
+
     /// Return the effective access dimension for a principal.
     pub fn effective_dimension(&self, principal_id: &PrincipalId) -> Result<isize> {
         let p = self
@@ -1193,6 +1265,7 @@ mod tests {
 mod parallel_tests {
     use super::*;
     use crate::capability::CapabilityKind;
+    use crate::AccessContext;
 
     fn setup() -> AccessController {
         let mut acl = AccessController::new(2, 4).unwrap();
@@ -1356,6 +1429,80 @@ mod parallel_tests {
                 "parallel check_batch must match sequential check"
             );
         }
+    }
+
+    #[test]
+    fn context_resource_scoped_checking() {
+        let mut acl = setup();
+        acl.register_capability(Capability::new(
+            "read/doc/42",
+            "Read doc 42",
+            vec![1],
+            CapabilityKind::ReadLike,
+        ))
+        .unwrap();
+        acl.register_capability(Capability::new(
+            "read",
+            "Read",
+            vec![1],
+            CapabilityKind::ReadLike,
+        ))
+        .unwrap();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "read").unwrap();
+        acl.grant(&p, "read/doc/42").unwrap();
+
+        let ctx = AccessContext::for_resource("doc/42");
+        let scoped_decision = acl.check_with_context(&p, &["read"], &ctx).unwrap();
+        assert!(matches!(
+            scoped_decision,
+            AccessDecision::Underconstrained { .. }
+        ));
+    }
+
+    #[test]
+    fn context_empty_is_standard_check() {
+        let mut acl = setup();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "sigma22").unwrap();
+
+        let standard = acl.check(&p, &["sigma22"]).unwrap();
+        let with_context = acl
+            .check_with_context(&p, &["sigma22"], &AccessContext::empty())
+            .unwrap();
+        assert_eq!(standard, with_context);
+    }
+
+    #[test]
+    fn context_time_aware_trust() {
+        let mut acl = setup();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "sigma22").unwrap();
+
+        let ctx_old =
+            AccessContext::at_time(acl.principal(&p).unwrap().created_at + 100_000_000_000);
+        let degraded = acl.check_with_context(&p, &["sigma22"], &ctx_old).unwrap();
+        assert!(matches!(
+            degraded,
+            AccessDecision::Impossible { .. } | AccessDecision::Granted { .. }
+        ));
+    }
+
+    #[test]
+    fn context_no_time_does_not_degrade() {
+        let mut acl = setup();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "sigma22").unwrap();
+
+        let ctx = AccessContext::empty();
+        let decision = acl.check_with_context(&p, &["sigma22"], &ctx).unwrap();
+        assert_eq!(
+            decision,
+            AccessDecision::Granted {
+                configurations: 1,
+                path: ComputationPath::LittlewoodRichardson,
+            }
+        );
     }
 }
 

@@ -138,7 +138,7 @@ pub use audit::{DecisionRecord, InMemoryAudit};
 pub use capability::{Capability, CapabilityId, CapabilityKind};
 pub use composition::{are_composable, compose, CompositionResult};
 pub use controller::AccessController;
-pub use decision::{AccessDecision, ComputationPath};
+pub use decision::{AccessContext, AccessDecision, ComputationPath};
 pub use error::{Result, SchubertError};
 pub use principal::{Principal, PrincipalId};
 pub use stability::{
