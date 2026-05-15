@@ -32,20 +32,35 @@
 //! ```
 
 pub use amari_enumerative::phantom::{
-    // Partition validity
-    PartitionValidity, UnvalidatedPartition, ValidPartition,
-    // Tableau properties
-    LatticeWord, Semistandard, TableauValidity, UnverifiedTableau, ValidLRTableau,
-    // Capability grant states
-    Granted, GrantState, Pending, Revoked,
-    // Intersection dimension
-    Deficient, Excess, IntersectionDimension, Transverse, UnknownDimension,
     // Grassmannian containment
-    BoxContainment, FitsInBox, UnverifiedBox,
-    // Composite
-    ValidSchubertClass,
+    BoxContainment,
+    // Intersection dimension
+    Deficient,
+    Excess,
+    FitsInBox,
+    GrantState,
+    // Capability grant states
+    Granted,
+    IntersectionDimension,
+    // Tableau properties
+    LatticeWord,
+    // Partition validity
+    PartitionValidity,
+    Pending,
     // Generic wrapper
     Properties,
+    Revoked,
+    Semistandard,
+    TableauValidity,
+    Transverse,
+    UnknownDimension,
+    UnvalidatedPartition,
+    UnverifiedBox,
+    UnverifiedTableau,
+    ValidLRTableau,
+    ValidPartition,
+    // Composite
+    ValidSchubertClass,
 };
 
 /// Phantom markers specific to Schubert access control.

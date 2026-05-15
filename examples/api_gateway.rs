@@ -12,20 +12,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut acl = AccessController::new(2, 4)?;
 
     acl.register_capability(Capability::new(
-        "read:profile", "Read profile", vec![1], CapabilityKind::ReadLike,
+        "read:profile",
+        "Read profile",
+        vec![1],
+        CapabilityKind::ReadLike,
     ))?;
     acl.register_capability(Capability::new(
-        "read:email", "Read email", vec![1], CapabilityKind::ReadLike,
+        "read:email",
+        "Read email",
+        vec![1],
+        CapabilityKind::ReadLike,
     ))?;
     acl.register_capability(Capability::new(
-        "write:posts", "Write posts", vec![2], CapabilityKind::WriteLike,
+        "write:posts",
+        "Write posts",
+        vec![2],
+        CapabilityKind::WriteLike,
     ))?;
     acl.register_capability(Capability::new(
-        "admin:users", "Admin users", vec![2, 1], CapabilityKind::AdminLike,
+        "admin:users",
+        "Admin users",
+        vec![2, 1],
+        CapabilityKind::AdminLike,
     ))?;
     // σ₁₁ — geometrically incompatible with σ₂ in Gr(2,4)
     acl.register_capability(Capability::new(
-        "restricted:internal", "Internal only", vec![1, 1], CapabilityKind::WriteLike,
+        "restricted:internal",
+        "Internal only",
+        vec![1, 1],
+        CapabilityKind::WriteLike,
     ))?;
 
     let user = acl.create_principal("user_token")?;
@@ -40,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     acl.grant(&admin, "admin:users")?;
 
     let bad = acl.create_principal("bad_token")?;
-    acl.grant(&bad, "write:posts")?;         // σ₂
+    acl.grant(&bad, "write:posts")?; // σ₂
     acl.grant(&bad, "restricted:internal")?; // σ₁₁ — conflicts!
 
     println!("=== API Gateway Scope Validation ===\n");
@@ -49,7 +64,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("GET /profile", &["read:profile"][..]),
         ("POST /posts", &["write:posts"]),
         ("DELETE /users/:id", &["admin:users"]),
-        ("GET /internal/dashboard", &["write:posts", "restricted:internal"]),
+        (
+            "GET /internal/dashboard",
+            &["write:posts", "restricted:internal"],
+        ),
     ];
 
     let tokens = [
@@ -70,7 +88,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 AccessDecision::Underconstrained { .. } => "⚠️",
             };
             match &decision {
-                AccessDecision::Granted { configurations, path } => {
+                AccessDecision::Granted {
+                    configurations,
+                    path,
+                } => {
                     println!("  {symbol} {label}: GRANTED ({configurations} via {path:?})");
                 }
                 AccessDecision::Impossible { conflicting } => {

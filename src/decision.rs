@@ -118,3 +118,45 @@ impl From<amari_enumerative::IntersectionResult> for AccessDecision {
         }
     }
 }
+
+/// Optional context for access control decisions.
+///
+/// Extends the capability-based check with environmental factors:
+/// - **resource**: Scope the check to a specific resource (e.g., "project:123")
+/// - **time**: Current Unix timestamp in ms. When set, trust levels degrade
+///   based on time deltas.
+/// - **metadata**: Arbitrary key-value pairs for audit and custom logic.
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct AccessContext {
+    /// Specific resource this check is scoped to.
+    pub resource: Option<String>,
+    /// Current Unix timestamp in milliseconds.
+    pub time: Option<u64>,
+    /// Arbitrary context metadata for audit and custom logic.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
+impl AccessContext {
+    /// Create an empty context.
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Create a context with just a resource.
+    pub fn for_resource(resource: impl Into<String>) -> Self {
+        Self {
+            resource: Some(resource.into()),
+            ..Default::default()
+        }
+    }
+
+    /// Create a context with just a timestamp.
+    pub fn at_time(timestamp_ms: u64) -> Self {
+        Self {
+            time: Some(timestamp_ms),
+            ..Default::default()
+        }
+    }
+}

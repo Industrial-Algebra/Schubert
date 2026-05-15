@@ -13,14 +13,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for tenant in &["tenant_a", "tenant_b", "tenant_c"] {
         acl.register_capability(Capability::new(
-            format!("read:{tenant}"), format!("Read {tenant}"), vec![1], CapabilityKind::ReadLike,
+            format!("read:{tenant}"),
+            format!("Read {tenant}"),
+            vec![1],
+            CapabilityKind::ReadLike,
         ))?;
         acl.register_capability(Capability::new(
-            format!("write:{tenant}"), format!("Write {tenant}"), vec![2], CapabilityKind::WriteLike,
+            format!("write:{tenant}"),
+            format!("Write {tenant}"),
+            vec![2],
+            CapabilityKind::WriteLike,
         ))?;
     }
     acl.register_capability(Capability::new(
-        "analytics:cross_tenant", "Cross-tenant analytics", vec![2, 1], CapabilityKind::AdminLike,
+        "analytics:cross_tenant",
+        "Cross-tenant analytics",
+        vec![2, 1],
+        CapabilityKind::AdminLike,
     ))?;
 
     let alice = acl.create_principal("alice")?;
@@ -40,7 +49,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let queries = [
         ("SELECT FROM tenant_a", &["read:tenant_a"][..]),
         ("INSERT INTO tenant_b", &["write:tenant_b"]),
-        ("SELECT FROM all tenants", &["read:tenant_a", "read:tenant_b", "read:tenant_c"]),
+        (
+            "SELECT FROM all tenants",
+            &["read:tenant_a", "read:tenant_b", "read:tenant_c"],
+        ),
         ("DELETE FROM tenant_a", &["write:tenant_a"]),
     ];
 
@@ -73,12 +85,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Stability analysis
     println!("=== Stability of Tenant Isolation ===\n");
     let report = schubert::analyze_stability(&acl, &bob)?;
-    println!("Bob: {} breakpoints, {} walls", report.phase_diagram.len(), report.walls.len());
+    println!(
+        "Bob: {} breakpoints, {} walls",
+        report.phase_diagram.len(),
+        report.walls.len()
+    );
 
     for trust in [1.0, 0.5, 0.1] {
-        let stable = schubert::stable_capabilities_at(
-            &acl, &bob, schubert::TrustLevel::new(trust),
-        )?;
+        let stable =
+            schubert::stable_capabilities_at(&acl, &bob, schubert::TrustLevel::new(trust))?;
         println!("  Trust {trust:.1}: stable = {stable:?}");
     }
 

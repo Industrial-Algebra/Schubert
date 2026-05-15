@@ -76,21 +76,19 @@ Parsed at startup. Validated against the Grassmannian. This enables policy-as-co
 
 **Direction:** A `wasm` feature that compiles to WebAssembly. Embed Schubert access control in browser-based applications, edge functions, and serverless environments. Enables client-side policy validation with the same geometric guarantees.
 
-### 5. Context-Aware Decisions
+### 5. Context-Aware Decisions — ✅ DONE (v0.1.0)
 
-**Current:** `check()` only considers capabilities. No notion of resource, time, or environment.
+**Implemented:** `AccessContext` with resource, time, and metadata:
+- `check_with_context()` extends standard checks with resource scoping
+  and time-based trust degradation
+- Resource-scoped capabilities: `"cap/resource_id"` checked in addition
+  to base capability when context.resource is set
+- Time-aware trust: trust factor decays linearly from 1.0 (fresh) to
+  0.0 (2+ years old), scaling configuration counts
+- Builder methods: `AccessContext::empty()`, `for_resource()`, `at_time()`
 
-**Direction:** Add an optional `AccessContext` to checks:
-
-```rust
-pub struct AccessContext {
-    pub resource: Option<String>,
-    pub time: Option<u64>,
-    pub metadata: HashMap<String, String>,
-}
-```
-
-The context feeds into the stability engine — certain capabilities may be conditionally stable based on environmental factors.
+**Verified:** 4 tests (resource scoping, empty context matching standard
+check, time degradation, no-time no-degradation).
 
 ---
 

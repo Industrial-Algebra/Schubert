@@ -164,7 +164,10 @@ impl crate::Capability {
     /// # Errors
     ///
     /// Returns `InvalidPartition` if the partition doesn't fit in Gr(k,n).
-    pub fn prove(self, grassmannian: (usize, usize)) -> crate::Result<Proven<IsValidCapability, Self>> {
+    pub fn prove(
+        self,
+        grassmannian: (usize, usize),
+    ) -> crate::Result<Proven<IsValidCapability, Self>> {
         self.to_schubert_class(grassmannian)?;
         // SAFETY: to_schubert_class validated the partition above
         Ok(unsafe { Proven::axiom(self) })
@@ -240,24 +243,19 @@ pub mod law {
         cap_id: &str,
     ) -> Result<(), law_check::LawViolation> {
         // Grant once
-        acl.grant(principal_id, cap_id).map_err(|e| {
-            law_check::LawViolation {
+        acl.grant(principal_id, cap_id)
+            .map_err(|e| law_check::LawViolation {
                 law: "grant idempotency (first grant)",
                 left: "Ok(())".to_string(),
                 right: format!("{e}"),
-            }
-        })?;
+            })?;
 
-        let holds_after_first = acl
-            .principal(principal_id)
-            .is_some_and(|p| p.holds(cap_id));
+        let holds_after_first = acl.principal(principal_id).is_some_and(|p| p.holds(cap_id));
 
         // Grant again — may succeed (duplicate) or error
         let _ = acl.grant(principal_id, cap_id);
 
-        let holds_after_second = acl
-            .principal(principal_id)
-            .is_some_and(|p| p.holds(cap_id));
+        let holds_after_second = acl.principal(principal_id).is_some_and(|p| p.holds(cap_id));
 
         if holds_after_first && holds_after_second {
             Ok(())
@@ -278,31 +276,25 @@ pub mod law {
         principal_id: &crate::PrincipalId,
         cap_id: &str,
     ) -> Result<(), law_check::LawViolation> {
-        let holds_before = acl
-            .principal(principal_id)
-            .is_some_and(|p| p.holds(cap_id));
+        let holds_before = acl.principal(principal_id).is_some_and(|p| p.holds(cap_id));
 
         // Grant
-        acl.grant(principal_id, cap_id).map_err(|e| {
-            law_check::LawViolation {
+        acl.grant(principal_id, cap_id)
+            .map_err(|e| law_check::LawViolation {
                 law: "grant-revoke identity (grant)",
                 left: "Ok(())".to_string(),
                 right: format!("{e}"),
-            }
-        })?;
+            })?;
 
         // Revoke
-        acl.revoke(principal_id, cap_id).map_err(|e| {
-            law_check::LawViolation {
+        acl.revoke(principal_id, cap_id)
+            .map_err(|e| law_check::LawViolation {
                 law: "grant-revoke identity (revoke)",
                 left: "Ok(())".to_string(),
                 right: format!("{e}"),
-            }
-        })?;
+            })?;
 
-        let holds_after = acl
-            .principal(principal_id)
-            .is_some_and(|p| p.holds(cap_id));
+        let holds_after = acl.principal(principal_id).is_some_and(|p| p.holds(cap_id));
 
         if holds_after == holds_before {
             Ok(())
@@ -322,21 +314,21 @@ pub mod law {
         principal_id: &crate::PrincipalId,
         required: &[&str],
     ) -> Result<(), law_check::LawViolation> {
-        let first = acl.check(principal_id, required).map_err(|e| {
-            law_check::LawViolation {
+        let first = acl
+            .check(principal_id, required)
+            .map_err(|e| law_check::LawViolation {
                 law: "access idempotency",
                 left: "Ok(decision)".to_string(),
                 right: format!("{e}"),
-            }
-        })?;
+            })?;
 
-        let second = acl.check(principal_id, required).map_err(|e| {
-            law_check::LawViolation {
+        let second = acl
+            .check(principal_id, required)
+            .map_err(|e| law_check::LawViolation {
                 law: "access idempotency",
                 left: "Ok(decision)".to_string(),
                 right: format!("{e}"),
-            }
-        })?;
+            })?;
 
         if first == second {
             Ok(())
@@ -420,15 +412,24 @@ mod tests {
     fn setup() -> AccessController {
         let mut acl = AccessController::new(2, 4).unwrap();
         acl.register_capability(Capability::new(
-            "read:data", "Read", vec![1], CapabilityKind::ReadLike,
+            "read:data",
+            "Read",
+            vec![1],
+            CapabilityKind::ReadLike,
         ))
         .unwrap();
         acl.register_capability(Capability::new(
-            "write:data", "Write", vec![2], CapabilityKind::WriteLike,
+            "write:data",
+            "Write",
+            vec![2],
+            CapabilityKind::WriteLike,
         ))
         .unwrap();
         acl.register_capability(Capability::new(
-            "admin:*", "Admin", vec![2, 2], CapabilityKind::AdminLike,
+            "admin:*",
+            "Admin",
+            vec![2, 2],
+            CapabilityKind::AdminLike,
         ))
         .unwrap();
         acl
@@ -457,10 +458,13 @@ mod tests {
 
         let decision = acl.check(&p, &["admin:*"]).unwrap();
         let proven = decision.prove_finite().unwrap();
-        assert_eq!(*proven.value(), AccessDecision::Granted {
-            configurations: 1,
-            path: crate::ComputationPath::LittlewoodRichardson,
-        });
+        assert_eq!(
+            *proven.value(),
+            AccessDecision::Granted {
+                configurations: 1,
+                path: crate::ComputationPath::LittlewoodRichardson,
+            }
+        );
     }
 
     #[test]
@@ -471,7 +475,9 @@ mod tests {
 
     #[test]
     fn prove_finite_access_rejects_impossible() {
-        let decision = AccessDecision::Impossible { conflicting: vec![] };
+        let decision = AccessDecision::Impossible {
+            conflicting: vec![],
+        };
         assert!(decision.prove_finite().is_none());
     }
 
@@ -495,8 +501,7 @@ mod tests {
         use rewrite::{ByGrantCommutativity, GrantSeqAB, GrantSeqBA};
 
         // Compile-time: grant order is commutative
-        let _step: Rewrite<GrantSeqAB, GrantSeqBA, ByGrantCommutativity> =
-            Rewrite::witness();
+        let _step: Rewrite<GrantSeqAB, GrantSeqBA, ByGrantCommutativity> = Rewrite::witness();
     }
 
     #[test]
@@ -504,8 +509,7 @@ mod tests {
         use karpal_proof::rewrite::Rewrite;
         use rewrite::{ByGrantRevokeIdentity, GrantThenRevoke, NoOp};
 
-        let _step: Rewrite<GrantThenRevoke, NoOp, ByGrantRevokeIdentity> =
-            Rewrite::witness();
+        let _step: Rewrite<GrantThenRevoke, NoOp, ByGrantRevokeIdentity> = Rewrite::witness();
     }
 
     #[test]
@@ -513,8 +517,7 @@ mod tests {
         use karpal_proof::rewrite::Rewrite;
         use rewrite::{ByCheckCommutativity, CheckAB, CheckBA};
 
-        let _step: Rewrite<CheckAB, CheckBA, ByCheckCommutativity> =
-            Rewrite::witness();
+        let _step: Rewrite<CheckAB, CheckBA, ByCheckCommutativity> = Rewrite::witness();
     }
 
     #[test]
@@ -550,8 +553,7 @@ mod tests {
         use karpal_proof::Proven;
 
         let cap = Capability::new("admin", "Admin", vec![2, 2], CapabilityKind::AdminLike);
-        let admin_proof: Proven<IsAdminLike, Capability> =
-            unsafe { Proven::axiom(cap) };
+        let admin_proof: Proven<IsAdminLike, Capability> = unsafe { Proven::axiom(cap) };
 
         // Derive downward through the hierarchy (clone to avoid move)
         let write_proof: Proven<IsWriteLike, Capability> = admin_proof.clone().derive();
