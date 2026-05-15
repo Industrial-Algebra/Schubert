@@ -44,6 +44,8 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Schubert
       - name: Run clippy (all features)
         working-directory: Schubert
         run: cargo clippy --all-targets --all-features -- -D warnings
@@ -75,6 +77,8 @@ jobs:
           path: karpal
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Schubert
       - name: Run tests ${{ matrix.features }}
         working-directory: Schubert
         run: cargo test ${{ matrix.features }}
@@ -98,8 +102,40 @@ jobs:
           path: karpal
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Schubert
       - name: Build docs (all features)
         working-directory: Schubert
         run: cargo doc --all-features --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
+
+  wasm:
+    name: WASM Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: Schubert
+      - name: Checkout Amari
+        uses: actions/checkout@v4
+        with:
+          repository: justinelliottcobb/Amari
+          path: amari
+      - name: Checkout Karpal
+        uses: actions/checkout@v4
+        with:
+          repository: Industrial-Algebra/Karpal
+          path: karpal
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Schubert
+      - name: Check wasm32 build (no default features)
+        working-directory: Schubert
+        run: cargo check --target wasm32-unknown-unknown --no-default-features
+      - name: Check wasm32 build (wasm feature)
+        working-directory: Schubert
+        run: cargo check --target wasm32-unknown-unknown --features wasm

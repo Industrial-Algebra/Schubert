@@ -103,6 +103,9 @@
 #![warn(missing_docs)]
 #![warn(clippy::all)]
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 pub mod audit;
 pub mod capability;
 pub mod composition;
@@ -121,9 +124,17 @@ pub mod principal;
 #[cfg(feature = "karpal")]
 pub mod proof;
 pub mod stability;
+/// WebAssembly bindings (requires `wasm` feature).
+#[cfg(feature = "wasm")]
+pub mod wasm;
 
 // Core types — everything you typically need
-pub use audit::{AuditSink, DecisionRecord, InMemoryAudit};
+/// Pluggable audit sink for recording access decisions (requires `std`).
+#[cfg(feature = "std")]
+/// Pluggable audit sink for recording access decisions (requires `std`).
+#[cfg(feature = "std")]
+pub use audit::AuditSink;
+pub use audit::{DecisionRecord, InMemoryAudit};
 pub use capability::{Capability, CapabilityId, CapabilityKind};
 pub use composition::{are_composable, compose, CompositionResult};
 pub use controller::AccessController;

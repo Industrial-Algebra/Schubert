@@ -59,11 +59,18 @@ access decisions (including σ₁⁴=2 and σ₂·σ₁₁ impossibility), grant
 
 **Verified:** 15 policy tests (parse, validate, apply, roundtrip, error cases, file loading).
 
-### 4. WebAssembly Target
+### 4. WebAssembly Target — ✅ DONE (v0.1.0)
 
-**Current:** Depends on `amari-enumerative`, which is not wasm-ready on all paths.
+**Implemented:** Full wasm32-unknown-unknown compatibility:
+- `wasm` feature propagates to `amari-enumerative/wasm`
+- `WasmController` — wasm-bindgen wrapper with full JavaScript API
+- `AuditSink` gated behind `std` feature (not available on wasm)
+- `InMemoryAudit` uses `RefCell` in no_std, plain `Vec` on wasm
+- `now_millis()` returns 0 on wasm32
+- CI checks: wasm32 build without features + with `wasm` feature
 
-**Direction:** A `wasm` feature that compiles to WebAssembly. Embed Schubert access control in browser-based applications, edge functions, and serverless environments. Enables client-side policy validation with the same geometric guarantees.
+**Verified:** Compiles cleanly for `wasm32-unknown-unknown` with both
+`--no-default-features` and `--features wasm`.
 
 ### 5. Context-Aware Decisions
 

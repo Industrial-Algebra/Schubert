@@ -1,6 +1,8 @@
 // Copyright (C) 2026 Industrial Algebra
 // SPDX-License-Identifier: AGPL-3.0-only
 
+#[cfg(feature = "std")]
+#[cfg(feature = "std")]
 use crate::audit::AuditSink;
 use crate::capability::{Capability, CapabilityId};
 use crate::decision::{AccessDecision, ComputationPath};
@@ -31,7 +33,10 @@ pub struct AccessController {
     grassmannian: (usize, usize),
     capabilities: HashMap<CapabilityId, Capability>,
     principals: HashMap<PrincipalId, Principal>,
+    #[cfg(feature = "std")]
     audit_sink: Option<Box<dyn AuditSink>>,
+    #[cfg(not(feature = "std"))]
+    _audit_disabled: (),
 }
 
 impl std::fmt::Debug for AccessController {
@@ -40,7 +45,6 @@ impl std::fmt::Debug for AccessController {
             .field("grassmannian", &self.grassmannian)
             .field("capabilities", &self.capabilities.len())
             .field("principals", &self.principals.len())
-            .field("audit_sink", &self.audit_sink.as_ref().map(|_| "…"))
             .finish()
     }
 }
@@ -59,7 +63,10 @@ impl AccessController {
             grassmannian: (k, n),
             capabilities: HashMap::new(),
             principals: HashMap::new(),
+            #[cfg(feature = "std")]
             audit_sink: None,
+            #[cfg(not(feature = "std"))]
+            _audit_disabled: (),
         })
     }
 
@@ -72,6 +79,7 @@ impl AccessController {
     ///
     /// The sink receives every decision made by [`check`](Self::check).
     /// Audit failures are silently ignored — they never affect access decisions.
+    #[cfg(feature = "std")]
     pub fn set_audit_sink(&mut self, sink: Box<dyn AuditSink>) {
         self.audit_sink = Some(sink);
     }
@@ -256,7 +264,8 @@ impl AccessController {
             ComputationPath::Matroid => self.compute_matroid(&all, required),
         }?;
 
-        // Audit
+        // Audit (only with std)
+        #[cfg(feature = "std")]
         if let Some(ref sink) = self.audit_sink {
             let _ = sink.record(&crate::audit::DecisionRecord {
                 principal: principal_id.clone(),
@@ -818,7 +827,10 @@ impl<'de> serde::Deserialize<'de> for AccessController {
             grassmannian: (k, n),
             capabilities: HashMap::new(),
             principals: HashMap::new(),
+            #[cfg(feature = "std")]
             audit_sink: None,
+            #[cfg(not(feature = "std"))]
+            _audit_disabled: (),
         };
 
         for cap in data.capabilities {
