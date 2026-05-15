@@ -131,6 +131,8 @@ pub mod wasm;
 // Core types — everything you typically need
 /// Pluggable audit sink for recording access decisions (requires `std`).
 #[cfg(feature = "std")]
+/// Pluggable audit sink for recording access decisions (requires `std`).
+#[cfg(feature = "std")]
 pub use audit::AuditSink;
 pub use audit::{DecisionRecord, InMemoryAudit};
 pub use capability::{Capability, CapabilityId, CapabilityKind};
