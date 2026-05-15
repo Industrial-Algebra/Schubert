@@ -48,27 +48,16 @@ Matroid correctly detects impossibility.
 **Verified:** 8 roundtrip tests covering empty controller, capabilities, principals,
 access decisions (including σ₁⁴=2 and σ₂·σ₁₁ impossibility), grants, revokes, and file I/O.
 
-### 3. Policy Language
+### 3. Policy Language — ✅ DONE (v0.1.0)
 
-**Current:** Capabilities are defined programmatically in Rust. No declarative specification.
+**Implemented:** Declarative TOML policy format with full validation:
+- `PolicyConfig` struct with serde Deserialize/Serialize
+- `from_policy_toml()` / `to_policy_toml()` on `AccessController`
+- Grassmannian validation, partition bounds checks, weakly-decreasing check
+- Principal grant reference validation
+- `examples/policies/rbac.toml` — complete Kubernetes RBAC policy file
 
-**Direction:** A simple policy language (TOML, YAML, or a custom DSL) for defining capabilities, principals, and grants:
-
-```toml
-[grassmannian]
-k = 2
-n = 4
-
-[capabilities.read_data]
-partition = [1]
-kind = "ReadLike"
-label = "Read data"
-
-[principals.alice]
-grants = ["read_data", "write_data"]
-```
-
-Parsed at startup. Validated against the Grassmannian. This enables policy-as-code with geometric guarantees.
+**Verified:** 15 policy tests (parse, validate, apply, roundtrip, error cases, file loading).
 
 ### 4. WebAssembly Target
 

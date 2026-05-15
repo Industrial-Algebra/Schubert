@@ -86,6 +86,9 @@
 //! - `parallel` — Enables batch operations via [`rayon`]: [`AccessController::check_batch`],
 //!   [`AccessController::stability_batch`], [`AccessController::compose_batch`].
 //!   These compute multiple queries in parallel using amari's batch intersection engine.
+//! - `policy` — Enables the declarative TOML policy language via the [`policy`] module.
+//!   Use [`AccessController::from_policy_toml`] to load policies and
+//!   [`AccessController::to_policy_toml`] to export them.
 //!
 //! ## `no_std` Support
 //!
@@ -112,6 +115,9 @@ pub mod error;
 pub mod multi;
 /// Compile-time phantom type markers from amari-enumerative.
 pub mod phantom;
+/// Declarative policy language (TOML). Requires `policy` feature.
+#[cfg(feature = "policy")]
+pub mod policy;
 pub mod principal;
 /// Proof-carrying access control via Karpal (requires `karpal` feature).
 #[cfg(feature = "karpal")]

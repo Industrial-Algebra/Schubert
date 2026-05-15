@@ -1,0 +1,50 @@
+# Schubert Access Control Policy — Kubernetes RBAC
+#
+# Defines the standard 4-role model as a declarative TOML policy.
+# Each capability is a Schubert condition on Gr(2,4).
+#
+# Roles:
+#   - viewer:  read:pods (σ₁, codim 1)
+#   - editor:  read:pods (σ₁) + write:pods (σ₂)
+#   - operator: read:pods (σ₁) + manage:deployments (σ₂₁, codim 3)
+#   - admin:    admin:* (σ₂₂, codim 4 — point class)
+
+[grassmannian]
+k = 2
+n = 4
+
+[capabilities.read_pods]
+partition = [1]
+kind = "ReadLike"
+label = "Read pods"
+description = "Read-only access to pod resources"
+
+[capabilities.write_pods]
+partition = [2]
+kind = "WriteLike"
+label = "Write pods"
+description = "Write access to pod resources"
+
+[capabilities.manage_deployments]
+partition = [2, 1]
+kind = "AdminLike"
+label = "Manage deployments"
+description = "Create, update, and delete deployments"
+
+[capabilities.admin_star]
+partition = [2, 2]
+kind = "AdminLike"
+label = "Full admin"
+description = "Full administrative access (point class)"
+
+[principals.alice]
+grants = ["read_pods"]
+
+[principals.bob]
+grants = ["read_pods", "write_pods"]
+
+[principals.carol]
+grants = ["read_pods", "manage_deployments"]
+
+[principals.dave]
+grants = ["admin_star"]

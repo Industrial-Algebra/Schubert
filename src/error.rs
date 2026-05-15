@@ -94,9 +94,13 @@ pub enum SchubertError {
     #[error("serialization error: {0}")]
     Serialization(String),
 
-    /// Generic error for multi-controller and other operations.
-    #[error("{0}")]
-    Generic(String),
+    /// Policy parse error.
+    #[error("policy parse error: {0}")]
+    PolicyParseError(String),
+
+    /// Policy export error.
+    #[error("policy export error: {0}")]
+    PolicyExportError(String),
 }
 
 /// Result type alias for Schubert operations.
