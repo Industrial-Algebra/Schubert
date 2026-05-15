@@ -832,7 +832,7 @@ impl AccessController {
 }
 
 /// Map an amari `IntersectionResult` to a Schubert `AccessDecision`.
-fn map_intersection_result(
+pub(crate) fn map_intersection_result(
     result: IntersectionResult,
     required: &[&str],
     path: ComputationPath,

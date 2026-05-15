@@ -114,6 +114,8 @@ pub mod controller;
 /// Access decision types — the quantitative result of every check.
 pub mod decision;
 pub mod error;
+/// Multi-Grassmannian access control.
+pub mod multi;
 /// Compile-time phantom type markers from amari-enumerative.
 pub mod phantom;
 /// Declarative policy language (TOML). Requires `policy` feature.
@@ -140,6 +142,7 @@ pub use composition::{are_composable, compose, CompositionResult};
 pub use controller::AccessController;
 pub use decision::{AccessContext, AccessDecision, ComputationPath};
 pub use error::{Result, SchubertError};
+pub use multi::MultiController;
 pub use principal::{Principal, PrincipalId};
 pub use stability::{
     analyze_stability, stable_capabilities_at, StabilityBreakpoint, StabilityReport, TrustLevel,

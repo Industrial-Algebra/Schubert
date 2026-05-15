@@ -101,6 +101,10 @@ pub enum SchubertError {
     /// Policy export error.
     #[error("policy export error: {0}")]
     PolicyExportError(String),
+
+    /// Generic error for multi-controller and other operations.
+    #[error("{0}")]
+    Generic(String),
 }
 
 /// Result type alias for Schubert operations.
