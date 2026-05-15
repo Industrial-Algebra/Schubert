@@ -549,7 +549,7 @@ impl AccessController {
 
     /// Analyze stability for multiple principals in parallel.
     ///
-    /// Returns one [`StabilityReport`] per principal.
+    /// Returns one `StabilityReport` per principal.
     #[cfg(feature = "parallel")]
     pub fn stability_batch(
         &self,

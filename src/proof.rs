@@ -3,31 +3,31 @@
 
 //! Proof-carrying access control via Karpal.
 //!
-//! This module integrates [`karpal_proof`] with Schubert's geometric access
+//! This module integrates `karpal_proof` with Schubert's geometric access
 //! control, enabling compile-time verification of access control invariants
 //! and runtime law checking.
 //!
 //! # Property Types
 //!
-//! Schubert defines Karpal-compatible [`Property`] types for access control:
+//! Schubert defines Karpal-compatible `Property` types for access control:
 //!
 //! | Property | What It Proves |
 //! |----------|---------------|
-//! | [`IsValidCapability`] | Capability partition is valid for its Grassmannian |
-//! | [`IsHeldBy`] | Principal holds a specific capability |
-//! | [`IsFiniteAccess`] | Access decision is finite (transverse intersection) |
-//! | [`IsComposableWith`] | Two principals are composable via shared interface |
+//! | `IsValidCapability` | Capability partition is valid for its Grassmannian |
+//! | `IsHeldBy` | Principal holds a specific capability |
+//! | `IsFiniteAccess` | Access decision is finite (transverse intersection) |
+//! | `IsComposableWith` | Two principals are composable via shared interface |
 //!
 //! # Proven Wrappers
 //!
-//! - [`Proven<IsValidCapability, Capability>`] — A capability proven valid.
-//!   Use [`prove_capability()`] to construct.
-//! - [`Proven<IsFiniteAccess, AccessDecision>`] — An access decision proven
-//!   finite. Use [`prove_access()`] to construct.
+//! - `Proven<IsValidCapability, Capability>` — A capability proven valid.
+//!   Use `prove_capability()` to construct.
+//! - `Proven<IsFiniteAccess, AccessDecision>` — An access decision proven
+//!   finite. Use `prove_access()` to construct.
 //!
 //! # Law Verification
 //!
-//! The [`law`] submodule provides runtime verification of access control
+//! The `law` submodule provides runtime verification of access control
 //! algebraic laws (idempotency, associativity, grant/revoke identities).
 //!
 //! # Property Hierarchy
@@ -36,7 +36,7 @@
 //! IsAdminLike ──→ IsWriteLike ──→ IsReadLike
 //! ```
 //!
-//! Using Karpal's [`Implies`] trait, any capability kind higher in the
+//! Using Karpal's `Implies` trait, any capability kind higher in the
 //! hierarchy automatically proves the lower ones. A capability proven
 //! `IsAdminLike` can be derived as `IsWriteLike` or `IsReadLike`.
 
@@ -64,7 +64,7 @@ impl Property for IsValidCapability {
 /// Property: a principal holds a specific capability.
 ///
 /// Carries the capability ID at the type level via a const generic marker.
-/// For runtime verification, use [`law::check_principal_holds()`].
+/// For runtime verification, use `law::check_*`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct IsHeldBy;
 
