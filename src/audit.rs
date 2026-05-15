@@ -136,4 +136,15 @@ impl AuditSink for InMemoryAudit {
         self.records.lock().unwrap().push(record.clone());
         Ok(())
     }
+
+    #[cfg(not(feature = "std"))]
+    fn record(&self, record: &DecisionRecord) -> Result<()> {
+        // Note: without std, InMemoryAudit is not thread-safe.
+        // This is acceptable for single-threaded no_std environments.
+        // SAFETY: In single-threaded no_std, this is safe.
+        let records = &self.records as *const alloc::vec::Vec<DecisionRecord>
+            as *mut alloc::vec::Vec<DecisionRecord>;
+        unsafe { &mut *records }.push(record.clone());
+        Ok(())
+    }
 }

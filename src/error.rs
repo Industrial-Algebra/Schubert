@@ -93,6 +93,14 @@ pub enum SchubertError {
     /// Serialization error from an audit sink.
     #[error("serialization error: {0}")]
     Serialization(String),
+
+    /// Policy parse error.
+    #[error("policy parse error: {0}")]
+    PolicyParseError(String),
+
+    /// Policy export error.
+    #[error("policy export error: {0}")]
+    PolicyExportError(String),
 }
 
 /// Result type alias for Schubert operations.
