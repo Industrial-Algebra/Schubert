@@ -115,6 +115,11 @@ jobs:
         with:
           repository: justinelliottcobb/Amari
           path: amari
+      - name: Checkout Karpal
+        uses: actions/checkout@v4
+        with:
+          repository: Industrial-Algebra/Karpal
+          path: karpal
       - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: wasm32-unknown-unknown
