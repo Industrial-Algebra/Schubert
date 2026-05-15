@@ -11,15 +11,15 @@
 //!
 //! | Category | Marker Trait | States |
 //! |----------|-------------|--------|
-//! | Partition validity | [`PartitionValidity`] | [`ValidPartition`], [`UnvalidatedPartition`] |
-//! | Grassmannian containment | [`BoxContainment`] | [`FitsInBox`], [`UnverifiedBox`] |
-//! | Capability grant lifecycle | [`GrantState`] | [`Granted`], [`Pending`], [`Revoked`] |
-//! | Intersection dimension | [`IntersectionDimension`] | [`Transverse`], [`Excess`], [`Deficient`] |
+//! | Partition validity | `PartitionValidity` | `ValidPartition`, `UnvalidatedPartition` |
+//! | Grassmannian containment | `BoxContainment` | `FitsInBox`, `UnverifiedBox` |
+//! | Capability grant lifecycle | `GrantState` | `Granted`, `Pending`, `Revoked` |
+//! | Intersection dimension | `IntersectionDimension` | `Transverse`, `Excess`, `Deficient` |
 //!
 //! # Composite Aliases (from amari)
 //!
-//! - [`ValidSchubertClass`] = `(ValidPartition, FitsInBox)` — fully validated capability
-//! - [`ValidLRTableau`] = `(Semistandard, LatticeWord)` — valid LR tableau
+//! - `ValidSchubertClass` = `(ValidPartition, FitsInBox)` — fully validated capability
+//! - `ValidLRTableau` = `(Semistandard, LatticeWord)` — valid LR tableau
 //!
 //! # Usage
 //!
