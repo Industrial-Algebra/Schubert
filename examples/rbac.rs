@@ -14,16 +14,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut acl = AccessController::new(2, 4)?;
 
     acl.register_capability(Capability::new(
-        "read:pods", "Read pods", vec![1], CapabilityKind::ReadLike,
+        "read:pods",
+        "Read pods",
+        vec![1],
+        CapabilityKind::ReadLike,
     ))?;
     acl.register_capability(Capability::new(
-        "write:pods", "Write pods", vec![2], CapabilityKind::WriteLike,
+        "write:pods",
+        "Write pods",
+        vec![2],
+        CapabilityKind::WriteLike,
     ))?;
     acl.register_capability(Capability::new(
-        "manage:deployments", "Manage deployments", vec![2, 1], CapabilityKind::AdminLike,
+        "manage:deployments",
+        "Manage deployments",
+        vec![2, 1],
+        CapabilityKind::AdminLike,
     ))?;
     acl.register_capability(Capability::new(
-        "admin:*", "Full admin", vec![2, 2], CapabilityKind::AdminLike,
+        "admin:*",
+        "Full admin",
+        vec![2, 2],
+        CapabilityKind::AdminLike,
     ))?;
 
     let alice = acl.create_principal("alice")?;
@@ -45,7 +57,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let checks = [
         ("alice (viewer)", &alice, &["read:pods"][..]),
         ("bob (editor)", &bob, &["read:pods", "write:pods"]),
-        ("carol (operator)", &carol, &["read:pods", "manage:deployments"]),
+        (
+            "carol (operator)",
+            &carol,
+            &["read:pods", "manage:deployments"],
+        ),
         ("dave (admin)", &dave, &["admin:*"]),
         ("bob → admin", &bob, &["admin:*"]),
         ("alice → write", &alice, &["write:pods"]),
@@ -55,7 +71,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let decision = acl.check(principal, required)?;
         print!("{label}: ");
         match decision {
-            AccessDecision::Granted { configurations, path } => {
+            AccessDecision::Granted {
+                configurations,
+                path,
+            } => {
                 println!("✅ GRANTED ({configurations} configs via {path:?})");
             }
             AccessDecision::Impossible { conflicting } => {
@@ -73,11 +92,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (label, principal) in [("bob", &bob), ("carol", &carol), ("dave", &dave)] {
         let report = schubert::analyze_stability(&acl, principal)?;
-        println!("{label}: {} breakpoints, {} walls", report.phase_diagram.len(), report.walls.len());
+        println!(
+            "{label}: {} breakpoints, {} walls",
+            report.phase_diagram.len(),
+            report.walls.len()
+        );
 
         for trust in [1.0, 0.8, 0.5, 0.3, 0.1] {
             let stable = schubert::stable_capabilities_at(
-                &acl, principal, schubert::TrustLevel::new(trust),
+                &acl,
+                principal,
+                schubert::TrustLevel::new(trust),
             )?;
             println!("  Trust {trust:.1}: stable = {stable:?}");
         }
