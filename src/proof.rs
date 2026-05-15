@@ -64,7 +64,7 @@ impl Property for IsValidCapability {
 /// Property: a principal holds a specific capability.
 ///
 /// Carries the capability ID at the type level via a const generic marker.
-/// For runtime verification, use `law::check_*`.
+/// For runtime verification, use `law::check_*` helpers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct IsHeldBy;
 

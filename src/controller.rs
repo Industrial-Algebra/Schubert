@@ -759,6 +759,67 @@ impl AccessController {
         serde_json::from_str(&json)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
     }
+
+    /// Create an access controller from a TOML policy string.
+    ///
+    /// Parses the policy, validates it, and applies all capabilities,
+    /// principals, and grants. The controller is fully initialized and
+    /// ready for access checks.
+    #[cfg(feature = "policy")]
+    pub fn from_policy_toml(toml_str: &str) -> Result<Self> {
+        let config = crate::policy::PolicyConfig::from_toml(toml_str)
+            .map_err(|e| SchubertError::PolicyParseError(e.to_string()))?;
+
+        let (k, n) = (config.grassmannian.k, config.grassmannian.n);
+        let mut acl = Self::new(k, n)?;
+        config.apply(&mut acl)?;
+        Ok(acl)
+    }
+
+    /// Export the controller state as a TOML policy string.
+    #[cfg(feature = "policy")]
+    pub fn to_policy_toml(&self) -> Result<String> {
+        let (k, n) = self.grassmannian;
+
+        let capabilities: std::collections::BTreeMap<String, crate::policy::CapabilityConfig> =
+            self.capabilities
+                .iter()
+                .map(|(id, cap)| {
+                    (
+                        id.to_string(),
+                        crate::policy::CapabilityConfig {
+                            partition: cap.partition.clone(),
+                            kind: crate::policy::CapabilityKindConfig::from(cap.kind),
+                            label: cap.label.clone(),
+                            description: cap.description.clone(),
+                        },
+                    )
+                })
+                .collect();
+
+        let principals: std::collections::BTreeMap<String, crate::policy::PrincipalConfig> = self
+            .principals
+            .iter()
+            .map(|(id, p)| {
+                (
+                    id.to_string(),
+                    crate::policy::PrincipalConfig {
+                        grants: p.granted_capability_ids.clone(),
+                    },
+                )
+            })
+            .collect();
+
+        let config = crate::policy::PolicyConfig {
+            grassmannian: crate::policy::GrassmannianConfig { k, n },
+            capabilities,
+            principals,
+        };
+
+        config
+            .to_toml()
+            .map_err(|e| SchubertError::PolicyExportError(e.to_string()))
+    }
 }
 
 /// Map an amari `IntersectionResult` to a Schubert `AccessDecision`.
@@ -1623,5 +1684,141 @@ mod serde_tests {
         let rp = restored.principal(&p).unwrap();
         let after = restored.check(&rp.id, &["read", "write"]).unwrap();
         assert_eq!(before, after, "file save/load must preserve decisions");
+    }
+}
+
+#[cfg(all(test, feature = "policy"))]
+mod policy_tests {
+    use super::*;
+
+    const RBAC_POLICY: &str = r#"
+[grassmannian]
+k = 2
+n = 4
+
+[capabilities.read]
+partition = [1]
+kind = "ReadLike"
+label = "Read"
+
+[capabilities.write]
+partition = [2]
+kind = "WriteLike"
+label = "Write"
+
+[capabilities.admin]
+partition = [2, 2]
+kind = "AdminLike"
+label = "Admin"
+
+[principals.alice]
+grants = ["read", "write"]
+
+[principals.bob]
+grants = ["read"]
+"#;
+
+    #[test]
+    fn from_policy_creates_controller() {
+        let acl = AccessController::from_policy_toml(RBAC_POLICY).unwrap();
+
+        assert_eq!(acl.grassmannian(), (2, 4));
+        assert!(acl.capability("read").is_some());
+        assert!(acl.capability("write").is_some());
+        assert!(acl.capability("admin").is_some());
+
+        let alice = acl.principal(&PrincipalId::new("alice")).unwrap();
+        let bob = acl.principal(&PrincipalId::new("bob")).unwrap();
+
+        assert!(alice.holds("read"));
+        assert!(alice.holds("write"));
+        assert!(bob.holds("read"));
+        assert!(!bob.holds("write"));
+    }
+
+    #[test]
+    fn from_policy_access_checks() {
+        let acl = AccessController::from_policy_toml(RBAC_POLICY).unwrap();
+        let alice = PrincipalId::new("alice");
+        let bob = PrincipalId::new("bob");
+
+        let alice_read = acl.check(&alice, &["read"]).unwrap();
+        assert!(matches!(
+            alice_read,
+            AccessDecision::Underconstrained { .. }
+        ));
+
+        let bob_write = acl.check(&bob, &["write"]).unwrap();
+        assert_eq!(bob_write, AccessDecision::Denied);
+
+        // sigma1_fourth test via policy
+        let alice_rw = acl.check(&alice, &["read", "write"]).unwrap();
+        // read=σ₁, write=σ₂ → intersection is σ₁·σ₂=σ₂₁ (positive dim)
+        assert!(matches!(alice_rw, AccessDecision::Underconstrained { .. }));
+    }
+
+    #[test]
+    fn from_policy_bad_toml_fails() {
+        let bad = "not valid toml [[[";
+        let result = AccessController::from_policy_toml(bad);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn policy_roundtrip() {
+        let acl = AccessController::from_policy_toml(RBAC_POLICY).unwrap();
+        let exported = acl.to_policy_toml().unwrap();
+        let acl2 = AccessController::from_policy_toml(&exported).unwrap();
+
+        // Check same capabilities
+        for id in &["read", "write", "admin"] {
+            let c1 = acl.capability(id).unwrap();
+            let c2 = acl2.capability(id).unwrap();
+            assert_eq!(c1.partition, c2.partition);
+            assert_eq!(c1.kind, c2.kind);
+        }
+
+        // Check same grants
+        let alice = PrincipalId::new("alice");
+        assert!(acl2.principal(&alice).unwrap().holds("read"));
+        assert!(acl2.principal(&alice).unwrap().holds("write"));
+    }
+
+    #[test]
+    fn policy_with_empty_principals() {
+        let minimal = r#"
+[grassmannian]
+k = 2
+n = 4
+
+[capabilities.read]
+partition = [1]
+kind = "ReadLike"
+label = "Read"
+"#;
+        let acl = AccessController::from_policy_toml(minimal).unwrap();
+        assert!(acl.capability("read").is_some());
+    }
+
+    #[test]
+    fn load_policy_file() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/examples/policies/rbac.toml");
+        let toml_str = std::fs::read_to_string(path).unwrap();
+        let acl = AccessController::from_policy_toml(&toml_str).unwrap();
+
+        assert_eq!(acl.grassmannian(), (2, 4));
+        assert!(acl.capability("read_pods").is_some());
+        assert!(acl.capability("write_pods").is_some());
+        assert!(acl.capability("manage_deployments").is_some());
+        assert!(acl.capability("admin_star").is_some());
+
+        // Check Alice (viewer: read_pods only)
+        let alice = acl.principal(&PrincipalId::new("alice")).unwrap();
+        assert!(alice.holds("read_pods"));
+        assert!(!alice.holds("write_pods"));
+
+        // Check Dave (admin: admin_star only)
+        let dave = acl.principal(&PrincipalId::new("dave")).unwrap();
+        assert!(dave.holds("admin_star"));
     }
 }
