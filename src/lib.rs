@@ -85,10 +85,11 @@
 //!   control invariants via [`karpal_proof::Proven`] and [`karpal_proof::Rewrite`].
 //! - `parallel` — Enables batch operations via [`rayon`]: [`AccessController::check_batch`],
 //!   [`AccessController::stability_batch`], [`AccessController::compose_batch`].
-//!   These compute multiple queries in parallel using amari's batch intersection engine.
-//! - `policy` — Enables the declarative TOML policy language via the [`policy`] module.
-//!   Use [`AccessController::from_policy_toml`] to load policies and
-//!   [`AccessController::to_policy_toml`] to export them.
+//! - `policy` — Enables the [`policy`] module: declarative TOML policy language.
+//!   Use [`AccessController::from_policy_toml`] and [`to_policy_toml`].
+//! - `wasm` — Enables the [`wasm`] module with wasm-bindgen JavaScript bindings.
+//!   Compiles to `wasm32-unknown-unknown` with `--no-default-features`.
+//!   See [`wasm::WasmController`] for the browser API.
 //!
 //! ## `no_std` Support
 //!

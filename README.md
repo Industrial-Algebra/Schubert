@@ -188,6 +188,110 @@ acl.set_audit_sink(Box::new(audit));
 
 Implement `AuditSink` for your own storage backend (database, log stream, event bus).
 
+## Feature Flags
+
+| Feature | What It Enables |
+|---------|----------------|
+| `std` (default) | HashMap, SystemTime, thread-safe audit via Mutex |
+| `serde` | Serialize/Deserialize on all key types + JSON I/O |
+| `karpal` | Compile-time verification via `karpal_proof::Proven` + Rewrite |
+| `parallel` | Batch operations via rayon: `check_batch`, `stability_batch` |
+| `policy` | Declarative TOML policy language |
+| `wasm` | wasm-bindgen JS bindings for browser-based access control |
+
+## Computation Paths
+
+Four engines for computing Schubert intersections, selectable via `check_with_path()`:
+
+| Path | Engine | Best For |
+|------|--------|----------|
+| `LittlewoodRichardson` | Classical LR rule | Small Gr(k,n), exact results |
+| `Localization` | Atiyah-Bott fixed-point | Large Gr(k,n), many classes |
+| `Tropical` | Tropical intersection theory | Fast approximate counts |
+| `Matroid` | Matroid independence check | Polynomial-time impossibility detection |
+
+Auto-routing via `check_auto()`: uses LR for Gr(k,n≤8) and localization for larger spaces.
+
+## Policy Language (`policy` feature)
+
+Define access control policies declaratively in TOML:
+
+```toml
+# examples/policies/rbac.toml
+[grassmannian]
+k = 2
+n = 4
+
+[capabilities.read_pods]
+partition = [1]
+kind = "ReadLike"
+label = "Read pods"
+
+[principals.alice]
+grants = ["read_pods"]
+```
+
+```rust
+let acl = AccessController::from_policy_toml(&toml_str)?;
+// Roundtrip: export back to TOML
+let toml = acl.to_policy_toml()?;
+```
+
+The policy is validated at parse time — partitions must fit in the Grassmannian,
+be weakly decreasing, and all principal grants must reference defined capabilities.
+
+## WebAssembly (`wasm` feature)
+
+Embed Schubert in the browser via `WasmController`:
+
+```js
+import { WasmController } from './schubert.js';
+
+const acl = new WasmController(2, 4);
+acl.register_capability("read", "Read", [1], "ReadLike");
+const alice = acl.create_principal("alice");
+acl.grant(alice, "read");
+const result = acl.check(alice, ["read"]);
+// result.tag = "underconstrained", result.dimension = 3
+```
+
+Compiles to `wasm32-unknown-unknown`. Audit sink requires `std` (not available on wasm).
+
+## Context-Aware Access
+
+Extend access checks with resource scoping and time-aware trust:
+
+```rust
+use schubert::AccessContext;
+
+// Resource-scoped: also checks "read/doc/42" if registered
+let ctx = AccessContext::for_resource("doc/42");
+let decision = acl.check_with_context(&alice, &["read"], &ctx)?;
+
+// Time-aware: trust decays over 2 years, scaling config counts
+let ctx = AccessContext::at_time(future_timestamp);
+let decision = acl.check_with_context(&alice, &["admin"], &ctx)?;
+```
+
+## Multi-Grassmannian Control
+
+Manage access across multiple Grassmannian domains:
+
+```rust
+use schubert::MultiController;
+
+let mut mc = MultiController::new();
+let gr24 = mc.add_domain(2, 4)?;  // Standard RBAC domain
+let gr36 = mc.add_domain(3, 6)?;  // Multi-tenant domain
+
+mc.register_in_domain(Capability::new("read", "Read", vec![1], …), &gr24)?;
+let alice = mc.create_principal("alice", &gr24)?;
+mc.grant_in_domain(&alice, "read", &gr24)?;
+
+// Cross-domain: check if Gr(2,4) capability works in Gr(3,6)
+mc.check_cross_domain(&alice, &["read"], &gr24, &gr36)?;
+```
+
 ## Examples
 
 ```bash
@@ -197,16 +301,32 @@ cargo run --example rbac
 # OAuth scope intersection with geometric conflict detection
 cargo run --example api_gateway
 
-# Multi-tenant row-level security with composition
+# Multi-tenant row-level security
 cargo run --example row_security
+
+# Policy-driven access from TOML file
+cargo run --example policy_loader --features policy
+
+# Multi-Grassmannian cross-domain access
+cargo run --example cross_domain
+
+# Context-aware decisions with resource scoping
+cargo run --example context_aware
 ```
 
 ## Dependencies
 
 - `amari-enumerative` v0.22 — Schubert calculus, intersection theory, wall-crossing
-- `thiserror` — Error derive macros
+- `thiserror` v2 — Error derive macros
 
-No async runtime. No network stack. No serialization. Embeddable in any Rust project.
+Optional (behind feature gates):
+- `serde` + `serde_json` — Serialization and JSON I/O
+- `karpal-proof` v0.3 — Compile-time proof verification
+- `rayon` — Parallel batch operations
+- `toml` — Policy language parsing
+- `wasm-bindgen` + `js-sys` — WebAssembly bindings
+
+No async runtime. No network stack. Embeddable in any Rust project.
 
 ## What Schubert Is Not
 

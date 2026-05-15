@@ -42,3 +42,16 @@ path = "examples/api_gateway.rs"
 [[example]]
 name = "row_security"
 path = "examples/row_security.rs"
+
+[[example]]
+name = "policy_loader"
+path = "examples/policy_loader.rs"
+required-features = ["policy"]
+
+[[example]]
+name = "cross_domain"
+path = "examples/cross_domain.rs"
+
+[[example]]
+name = "context_aware"
+path = "examples/context_aware.rs"
