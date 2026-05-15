@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 #[cfg(feature = "std")]
+#[cfg(feature = "std")]
 use crate::audit::AuditSink;
 use crate::capability::{Capability, CapabilityId};
 use crate::decision::{AccessDecision, ComputationPath};
@@ -78,6 +79,7 @@ impl AccessController {
     ///
     /// The sink receives every decision made by [`check`](Self::check).
     /// Audit failures are silently ignored — they never affect access decisions.
+    #[cfg(feature = "std")]
     pub fn set_audit_sink(&mut self, sink: Box<dyn AuditSink>) {
         self.audit_sink = Some(sink);
     }
