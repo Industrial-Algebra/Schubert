@@ -90,6 +90,8 @@
 //! - `wasm` — Enables the [`wasm`] module with wasm-bindgen JavaScript bindings.
 //!   Compiles to `wasm32-unknown-unknown` with `--no-default-features`.
 //!   See [`wasm::WasmController`] for the browser API.
+//! - `crypto` — Enables the [`crypto`] module with Ed25519 capability tokens,
+//!   [`crypto::CapabilityIssuer`], and [`crypto::CapabilityVerifier`].
 //!
 //! ## `no_std` Support
 //!
@@ -112,6 +114,9 @@ pub mod capability;
 pub mod composition;
 /// Access controller managing principals, capabilities, and checks.
 pub mod controller;
+/// Cryptographic capability tokens (requires `crypto` feature).
+#[cfg(feature = "crypto")]
+pub mod crypto;
 /// Access decision types — the quantitative result of every check.
 pub mod decision;
 pub mod error;

@@ -105,14 +105,17 @@ check, time degradation, no-time no-degradation).
 cross-domain check, denied-if-not-held, partition-based domain discovery,
 duplicate label rejection).
 
-### 7. Proof-Carrying Capabilities — ✅ PARTIALLY DONE (v0.1.0)
+### 7. Proof-Carrying Capabilities — ✅ DONE (v0.1.0)
 
-**Current:** Karpal proof integration complete. `Proven<IsValidCapability, Capability>`,
-property hierarchy (`IsAdminLike: Implies<IsWriteLike>: Implies<IsReadLike>`),
-Rewrite rules, and law checks all implemented behind `karpal` feature.
+**Implemented:** Full cryptographic capability tokens via Ed25519:
+- `CapabilityToken` — signed assertion of principal+capability
+- `CapabilityIssuer` — generates key pairs and issues signed tokens
+- `CapabilityVerifier` — verifies signatures and extracts claims
+- `verify_batch()` for parallel verification (behind `parallel` feature)
+- Tamper-detection: modified tokens fail signature verification
 
-**Remaining:** Full cryptographic capability tokens (signature verification, distributed
-verification). This requires external crypto — see direction below.
+**Verified:** 6 tests (issue+verify, wrong key, tampered capability,
+tampered principal, verify_and_extract, batch issuance).
 
 ### 8. Temporal Access Control
 
