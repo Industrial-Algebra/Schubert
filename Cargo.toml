@@ -17,6 +17,8 @@ karpal = ["dep:karpal-proof"]
 parallel = ["dep:rayon", "amari-enumerative/parallel"]
 policy = ["serde", "dep:toml"]
 wasm = ["dep:wasm-bindgen", "dep:js-sys", "amari-enumerative/wasm"]
+# Forward-looking: will require karpal-verify when it ships (Karpal Phase 12)
+karpal-verify = []
 
 [dependencies]
 amari-enumerative = { path = "../amari/amari-enumerative", features = ["tropical-schubert"] }

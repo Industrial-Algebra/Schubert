@@ -90,6 +90,8 @@
 //! - `wasm` — Enables the [`wasm`] module with wasm-bindgen JavaScript bindings.
 //!   Compiles to `wasm32-unknown-unknown` with `--no-default-features`.
 //!   See [`wasm::WasmController`] for the browser API.
+//! - `karpal-verify` — Future: enables the [`verify`] module with SMT/Lean proof
+//!   obligations for Schubert calculus. Requires karpal-verify (Phase 12).
 //!
 //! ## `no_std` Support
 //!
@@ -127,6 +129,9 @@ pub mod principal;
 #[cfg(feature = "karpal")]
 pub mod proof;
 pub mod stability;
+/// Schubert calculus verification via Karpal (future: requires `karpal-verify`).
+#[cfg(feature = "karpal-verify")]
+pub mod verify;
 /// WebAssembly bindings (requires `wasm` feature).
 #[cfg(feature = "wasm")]
 pub mod wasm;
