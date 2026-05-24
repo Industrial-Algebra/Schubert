@@ -330,18 +330,18 @@ dependencies = [
 
 [[package]]
 name = "karpal-algebra"
-version = "0.3.0"
+version = "0.5.0"
 dependencies = [
  "karpal-core",
 ]
 
 [[package]]
 name = "karpal-core"
-version = "0.3.0"
+version = "0.5.0"
 
 [[package]]
 name = "karpal-proof"
-version = "0.3.0"
+version = "0.5.0"
 dependencies = [
  "karpal-algebra",
  "karpal-core",
@@ -350,7 +350,7 @@ dependencies = [
 
 [[package]]
 name = "karpal-proof-derive"
-version = "0.3.0"
+version = "0.5.0"
 dependencies = [
  "proc-macro2",
  "quote",
