@@ -14,10 +14,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "amari-core"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "169b6a42bab767903e32ee9302b7cf75993d63add5f1e24660c1dac1082aa958"
+dependencies = [
+ "approx",
+ "bytemuck",
+ "dashu-float",
+ "num-traits",
+ "thiserror",
+]
+
+[[package]]
 name = "amari-enumerative"
 version = "0.22.0"
 dependencies = [
- "amari-core",
+ "amari-core 0.22.0",
  "js-sys",
  "num-bigint",
  "num-rational",
@@ -28,6 +41,20 @@ dependencies = [
  "thiserror",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "amari-enumerative"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd44e016f160dbac33ee98449b051dd566d04060cf88c0d4190d3e3f2b07f512"
+dependencies = [
+ "amari-core 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-bigint",
+ "num-rational",
+ "num-traits",
+ "once_cell",
+ "thiserror",
 ]
 
 [[package]]
@@ -358,6 +385,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "karpal-schubert-types"
+version = "0.5.0"
+dependencies = [
+ "amari-enumerative 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "karpal-algebra",
+ "karpal-core",
+ "karpal-verify",
+]
+
+[[package]]
+name = "karpal-verify"
+version = "0.5.0"
+dependencies = [
+ "karpal-proof",
+ "karpal-verify-derive",
+]
+
+[[package]]
+name = "karpal-verify-derive"
+version = "0.5.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -534,10 +588,12 @@ checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 name = "schubert"
 version = "0.1.0"
 dependencies = [
- "amari-enumerative",
+ "amari-enumerative 0.22.0",
  "ed25519-dalek",
  "js-sys",
  "karpal-proof",
+ "karpal-schubert-types",
+ "karpal-verify",
  "rand",
  "rayon",
  "serde",

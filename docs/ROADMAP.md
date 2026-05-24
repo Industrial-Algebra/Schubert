@@ -145,9 +145,19 @@ Integration with Minuet-style holographic memory systems. Capabilities are bindi
 
 When `amari-surreal` supports generalized surreal numbers beyond the dyadic layer, trust levels could be surreal-valued — enabling infinite descending chains of trust degradation. A capability that becomes unstable at trust level ε (infinitesimal) remains stable at all finite trust levels but can be distinguished from one that becomes unstable at ε².
 
-### 13. Constitutional Verification
+### 13. Constitutional Verification — ✅ IMPLEMENTED (v0.1.0)
 
-When formal verification tooling (karpal-proof, karpal-verify) matures, capability partitions and access decisions become machine-checkable. A principal cannot be granted capabilities whose Schubert intersection exceeds specified bounds. The access controller's correctness is proved against the Schubert calculus axioms.
+Integrated with Karpal 0.5.0 verification infrastructure:
+- `verify::schubert_bundle()` — 5 proof obligations (LR consistency, partition
+  validity, intersection emptiness, access idempotency, grant-revoke identity)
+- `verify::verify_schubert()` — generates `VerificationReport` with
+  `ProofTestCertificate` for each obligation
+- `verify::certify_capability()` — wraps runtime validation in `Certified`
+  trust boundary backed by proof-test evidence
+- SMT-LIB2 and Lean 4 export via `export_schubert_smt()`/
+  `export_schubert_lean()`
+- CI: `.github/workflows/schubert-verify.yml` — proptest + SMT jobs
+- 6 new tests verifying the verification infrastructure itself
 
 ### 14. Distributed Access Control with CRDTs
 

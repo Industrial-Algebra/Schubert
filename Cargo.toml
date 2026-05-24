@@ -18,7 +18,7 @@ parallel = ["dep:rayon", "amari-enumerative/parallel"]
 policy = ["serde", "dep:toml"]
 wasm = ["dep:wasm-bindgen", "dep:js-sys", "amari-enumerative/wasm"]
 crypto = ["dep:ed25519-dalek", "dep:rand"]
-karpal-verify = []
+karpal-verify = ["dep:karpal-verify", "dep:karpal-schubert-types", "karpal"]
 
 [dependencies]
 amari-enumerative = { path = "../amari/amari-enumerative", features = ["tropical-schubert"] }
@@ -32,6 +32,8 @@ wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
 ed25519-dalek = { version = "2", optional = true, features = ["rand_core"] }
 rand = { version = "0.8", optional = true }
+karpal-verify = { path = "../karpal/karpal-verify", optional = true }
+karpal-schubert-types = { path = "../karpal/karpal-schubert-types", optional = true }
 
 [dev-dependencies]
 
