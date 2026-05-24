@@ -132,7 +132,7 @@ pub mod principal;
 #[cfg(feature = "karpal")]
 pub mod proof;
 pub mod stability;
-/// Schubert calculus verification via Karpal (requires `karpal-verify`).
+/// Schubert calculus verification via Karpal (future: requires `karpal-verify`).
 #[cfg(feature = "karpal-verify")]
 pub mod verify;
 /// WebAssembly bindings (requires `wasm` feature).

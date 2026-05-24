@@ -385,33 +385,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "karpal-schubert-types"
-version = "0.5.0"
-dependencies = [
- "amari-enumerative 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "karpal-algebra",
- "karpal-core",
- "karpal-verify",
-]
-
-[[package]]
-name = "karpal-verify"
-version = "0.5.0"
-dependencies = [
- "karpal-proof",
- "karpal-verify-derive",
-]
-
-[[package]]
-name = "karpal-verify-derive"
-version = "0.5.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
