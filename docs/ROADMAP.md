@@ -122,11 +122,18 @@ duplicate label rejection).
 **Verified:** 6 tests (issue+verify, wrong key, tampered capability,
 tampered principal, verify_and_extract, batch issuance).
 
-### 8. Temporal Access Control
+### 8. Temporal Access Control — ✅ DONE (v0.1.0)
 
-**Current:** Capabilities are permanent until revoked.
+**Implemented:** Timed capabilities with automatic expiry:
+- `Capability::expires_at` — optional Unix timestamp expiry
+- `Capability::with_expiry()` — builder pattern for timed capabilities
+- `Capability::is_expired_at()` / `time_remaining_at()` — expiry queries
+- `AccessController::check_temporal()` — access checks with expiry awareness
+- `expired_capabilities()` / `capability_time_remaining()` — temporal queries
+- `temporal_trust_level()` — linear trust decay from grant to expiry
 
-**Direction:** Timed capabilities with automatic expiry. The stability engine naturally models this — a capability with expiry time T has a trust level that decays to zero at T, crossing walls at predictable intervals. The phase diagram becomes a calendar.
+**Verified:** 6 tests (expired denied, no-expiry always allowed, mixed expiry,
+expired listing, trust decay, time remaining).
 
 ### 9. Quantitative Rate Limiting
 
