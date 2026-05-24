@@ -8,16 +8,21 @@
 ## Current State
 
 Schubert provides a practical access control library built on Schubert calculus.
-It is embeddable, synchronous, and depends only on `amari-enumerative` (plus
-optional `karpal-proof`, `serde`, `rayon`). The core API is implemented and
-tested at 30 unit tests, 0 warnings.
+It is embeddable, synchronous, and depends on `amari-enumerative` v0.22 (plus
+optional `karpal-proof`, `karpal-verify`, `serde`, `rayon`, `toml`).
+85 unit tests, 0 warnings across all feature combinations.
 
 **Completed since foundation:**
-- ✅ IA ecosystem conformance (rust-toolchain, phantom types, no_std scaffolding)
-- ✅ `serde` feature gate (derives on 11 key types)
-- ✅ `karpal` integration (Proven, Property hierarchy, Rewrite, law checks)
-- ✅ `parallel` feature gate (check_batch, stability_batch, compose_batch via rayon)
-- ✅ AGPL-3.0 dual-licensing (commercial licenses available)
+- ✅ IA ecosystem conformance, serde, karpal, parallel, policy, wasm, crypto
+- ✅ Computation path selection (4 paths + auto-routing)
+- ✅ Serialization roundtrip (AccessController serde + JSON/file I/O)
+- ✅ Policy language (declarative TOML)
+- ✅ WebAssembly target (wasm32-unknown-unknown)
+- ✅ Context-aware decisions (resource scoping + time-aware trust)
+- ✅ Multi-Grassmannian controllers (cross-domain access)
+- ✅ Proof-carrying capabilities (Ed25519 cryptographic tokens)
+- ✅ Constitutional verification (Karpal 0.5.0 integration)
+- ✅ AGPL-3.0 dual-licensing
 
 ---
 
@@ -137,31 +142,43 @@ tampered principal, verify_and_extract, batch issuance).
 
 Access decisions as routing rules. A network where route advertisement = capability grants and forwarding = Schubert intersection. The number of valid routes between source and destination is the intersection number. Congestion is codimension excess. This is the networking model explored in the ShaperOS transport layer, extracted as a standalone protocol.
 
-### 11. Access Control for Holographic Memory
+### 11. Surreal Trust Levels
 
-Integration with Minuet-style holographic memory systems. Capabilities are binding vectors in a holographic reduced representation. Access is granted when the query vector's similarity to the capability vector exceeds the trust threshold. The wall-crossing engine determines which memories are accessible at each trust level.
+Amari 0.23.0 provides `RationalSurreal` — exact rational surreal numbers
+with infinitesimal support via `EpsilonPolynomial` (`amari-surreal` with
+`experimental-epsilon` feature). Trust levels become surreal-valued:
 
-### 12. Surreal Trust Levels
+| Layer | Example | Meaning |
+|-------|---------|--------|
+| Finite real | `0.5` | Standard trust |
+| General rational | `3/7` | Exact, no floating-point artifacts |
+| Infinitesimal | `ε`, `ε²` | Distinct levels within the infinitesimal |
+| Mixed | `0.5 + ε` | Half trust plus a shred |
 
-When `amari-surreal` supports generalized surreal numbers beyond the dyadic layer, trust levels could be surreal-valued — enabling infinite descending chains of trust degradation. A capability that becomes unstable at trust level ε (infinitesimal) remains stable at all finite trust levels but can be distinguished from one that becomes unstable at ε².
+The wall-crossing engine generalizes naturally — the phase φ(t) formula
+is analytic in t. See `docs/surreal-trust-levels.md` for the full expansion.
 
-### 13. Constitutional Verification — ✅ IMPLEMENTED (v0.1.0)
+### 12. Constitutional Verification — ✅ IMPLEMENTED (v0.1.0)
 
 Integrated with Karpal 0.5.0 verification infrastructure:
-- `verify::schubert_bundle()` — 5 proof obligations (LR consistency, partition
-  validity, intersection emptiness, access idempotency, grant-revoke identity)
-- `verify::verify_schubert()` — generates `VerificationReport` with
-  `ProofTestCertificate` for each obligation
-- `verify::certify_capability()` — wraps runtime validation in `Certified`
-  trust boundary backed by proof-test evidence
-- SMT-LIB2 and Lean 4 export via `export_schubert_smt()`/
-  `export_schubert_lean()`
-- CI: `.github/workflows/schubert-verify.yml` — proptest + SMT jobs
-- 6 new tests verifying the verification infrastructure itself
+- `verify::schubert_bundle()` — 5 proof obligations
+- `verify::certify_capability()` — certified trust boundary
+- SMT-LIB2 and Lean 4 export support
+- CI: `.github/workflows/schubert-verify.yml`
 
-### 14. Distributed Access Control with CRDTs
+### 13. Distributed Access Control with CRDTs
 
 Operadic composition over a distributed system using conflict-free replicated data types. Principals hold vector clocks. Capability grants merge via geometric CRDT operations. The intersection number is computed from eventually-consistent state. This requires the Cliffy protocols geometric CRDT layer.
+
+### 14. Access Control for Holographic Memory
+
+> **Note:** Blocked pending Minuet relicensing.
+
+Integration with Minuet-style holographic memory systems. Capabilities are
+binding vectors in a holographic reduced representation. Access is granted
+when the query vector's similarity to the capability vector exceeds the trust
+threshold. The wall-crossing engine determines which memories are accessible
+at each trust level.
 
 ---
 
