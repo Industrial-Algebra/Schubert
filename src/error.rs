@@ -105,6 +105,10 @@ pub enum SchubertError {
     /// Generic error for multi-controller and other operations.
     #[error("{0}")]
     Generic(String),
+
+    /// Cryptographic verification failed.
+    #[error("crypto verification failed: {0}")]
+    CryptoVerificationFailed(String),
 }
 
 /// Result type alias for Schubert operations.
