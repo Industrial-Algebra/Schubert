@@ -18,7 +18,7 @@ parallel = ["dep:rayon", "amari-enumerative/parallel"]
 policy = ["serde", "dep:toml"]
 wasm = ["dep:wasm-bindgen", "dep:js-sys", "amari-enumerative/wasm"]
 crypto = ["dep:ed25519-dalek", "dep:rand"]
-karpal-verify = []
+karpal-verify = ["dep:karpal-verify", "dep:karpal-schubert-types", "karpal"]
 
 [dependencies]
 amari-enumerative = { path = "../amari/amari-enumerative", features = ["tropical-schubert"] }
