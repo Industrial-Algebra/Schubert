@@ -117,6 +117,13 @@ pub struct Capability {
     pub partition: Vec<usize>,
     /// Semantic kind for policy reasoning.
     pub kind: CapabilityKind,
+    /// Expiry time as Unix timestamp in milliseconds.
+    ///
+    /// When set, the capability automatically expires at this time.
+    /// Access checks with temporal context will treat expired capabilities
+    /// as revoked. `None` means the capability never expires.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub expires_at: Option<u64>,
 }
 
 impl Capability {
@@ -133,6 +140,7 @@ impl Capability {
             description: String::new(),
             partition,
             kind,
+            expires_at: None,
         }
     }
 
@@ -150,7 +158,27 @@ impl Capability {
             description: description.into(),
             partition,
             kind,
+            expires_at: None,
         }
+    }
+
+    /// Set an expiry time for this capability (builder pattern).
+    ///
+    /// `timestamp_ms` is a Unix timestamp in milliseconds. After this
+    /// time, the capability is considered expired in temporal access checks.
+    pub fn with_expiry(mut self, timestamp_ms: u64) -> Self {
+        self.expires_at = Some(timestamp_ms);
+        self
+    }
+
+    /// Check whether this capability has expired at the given time.
+    pub fn is_expired_at(&self, now_ms: u64) -> bool {
+        self.expires_at.is_some_and(|expiry| now_ms >= expiry)
+    }
+
+    /// Get the time remaining until expiry in milliseconds, if set.
+    pub fn time_remaining_at(&self, now_ms: u64) -> Option<u64> {
+        self.expires_at.map(|expiry| expiry.saturating_sub(now_ms))
     }
 
     /// The codimension of this capability — the sum of partition parts.
