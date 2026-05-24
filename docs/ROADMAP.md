@@ -158,19 +158,13 @@ with infinitesimal support via `EpsilonPolynomial` (`amari-surreal` with
 The wall-crossing engine generalizes naturally — the phase φ(t) formula
 is analytic in t. See `docs/surreal-trust-levels.md` for the full expansion.
 
-### 13. Constitutional Verification — ✅ IMPLEMENTED (v0.1.0)
+### 12. Constitutional Verification — ✅ IMPLEMENTED (v0.1.0)
 
 Integrated with Karpal 0.5.0 verification infrastructure:
-- `verify::schubert_bundle()` — 5 proof obligations (LR consistency, partition
-  validity, intersection emptiness, access idempotency, grant-revoke identity)
-- `verify::verify_schubert()` — generates `VerificationReport` with
-  `ProofTestCertificate` for each obligation
-- `verify::certify_capability()` — wraps runtime validation in `Certified`
-  trust boundary backed by proof-test evidence
-- SMT-LIB2 and Lean 4 export via `export_schubert_smt()`/
-  `export_schubert_lean()`
-- CI: `.github/workflows/schubert-verify.yml` — proptest + SMT jobs
-- 6 new tests verifying the verification infrastructure itself
+- `verify::schubert_bundle()` — 5 proof obligations
+- `verify::certify_capability()` — certified trust boundary
+- SMT-LIB2 and Lean 4 export support
+- CI: `.github/workflows/schubert-verify.yml`
 
 ### 13. Distributed Access Control with CRDTs
 
