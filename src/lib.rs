@@ -131,6 +131,8 @@ pub mod principal;
 /// Proof-carrying access control via Karpal (requires `karpal` feature).
 #[cfg(feature = "karpal")]
 pub mod proof;
+/// Quantitative rate limiting via Schubert intersection numbers.
+pub mod rate_limit;
 pub mod stability;
 /// Schubert calculus verification via Karpal (future: requires `karpal-verify`).
 #[cfg(feature = "karpal-verify")]
@@ -153,6 +155,7 @@ pub use decision::{AccessContext, AccessDecision, ComputationPath};
 pub use error::{Result, SchubertError};
 pub use multi::MultiController;
 pub use principal::{Principal, PrincipalId};
+pub use rate_limit::RateLimiter;
 pub use stability::{
     analyze_stability, stable_capabilities_at, StabilityBreakpoint, StabilityReport, TrustLevel,
 };
