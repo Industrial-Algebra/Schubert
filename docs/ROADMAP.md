@@ -135,11 +135,17 @@ tampered principal, verify_and_extract, batch issuance).
 **Verified:** 6 tests (expired denied, no-expiry always allowed, mixed expiry,
 expired listing, trust decay, time remaining).
 
-### 9. Quantitative Rate Limiting
+### 9. Quantitative Rate Limiting — ✅ DONE (v0.1.0)
 
-**Current:** Access is binary-geometric. No notion of rate.
+**Implemented:** Token-bucket rate limiting scaled by Schubert intersection numbers:
+- `RateLimiter` — per-principal token buckets with capacity = intersection_number × multiplier × base_rate
+- `configure_principal()` / `configure_from_decision()` — setup from access results
+- `try_consume()` / `can_consume()` — token consumption with refill
+- `tokens_available()` / `capacity()` — bucket state queries
+- Linear refill: tokens replenish at configured rate over time
 
-**Direction:** Blend Schubert intersection with token-bucket rate limiting. The intersection number determines the bucket capacity — access with 2 configurations gets 2× the rate of access with 1. The geometry of access maps to the geometry of throughput.
+**Verified:** 7 tests (consume, exhaust, higher-intersection-gets-more,
+configure from Granted/Denied, can_consume, remove principal).
 
 ---
 
