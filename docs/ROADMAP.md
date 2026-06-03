@@ -183,15 +183,17 @@ Integrated with Karpal 0.5.0 verification infrastructure:
 
 Operadic composition over a distributed system using conflict-free replicated data types. Principals hold vector clocks. Capability grants merge via geometric CRDT operations. The intersection number is computed from eventually-consistent state. This requires the Cliffy protocols geometric CRDT layer.
 
-### 14. Access Control for Holographic Memory
+### 14. Access Control for Holographic Memory — ✅ DONE (v0.1.0)
 
-> **Note:** Blocked pending Minuet relicensing.
+**Implemented:** Holographic memory access control via Minuet 0.3.0:
+- `HolographicAccessControl` — bridges Schubert calculus with holographic memory
+- `check_holo_access()` — combines Schubert intersection + holographic similarity
+- `HoloAccessResult` — granted, configurations, similarity, threshold
+- `accessible_at_trust()` — wall-crossing at holographic trust levels
+- Uses `SimpleStore<ProductCliffordAlgebra<32>>` for holographic trace storage
 
-Integration with Minuet-style holographic memory systems. Capabilities are
-binding vectors in a holographic reduced representation. Access is granted
-when the query vector's similarity to the capability vector exceeds the trust
-threshold. The wall-crossing engine determines which memories are accessible
-at each trust level.
+**Verified:** 7 tests (register/grant, denied, Schubert+holo, threshold,
+accessible, unit norm, self-similarity).
 
 ---
 

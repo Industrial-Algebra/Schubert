@@ -120,6 +120,9 @@ pub mod crypto;
 /// Access decision types — the quantitative result of every check.
 pub mod decision;
 pub mod error;
+/// Holographic memory access control via Minuet (requires `holographic` feature).
+#[cfg(feature = "holographic")]
+pub mod holographic;
 /// Multi-Grassmannian access control.
 pub mod multi;
 /// Compile-time phantom type markers from amari-enumerative.
