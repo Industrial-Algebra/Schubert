@@ -40,6 +40,11 @@ jobs:
         with:
           repository: Industrial-Algebra/Karpal
           path: karpal
+      - name: Checkout Minuet
+        uses: actions/checkout@v4
+        with:
+          repository: Industrial-Algebra/Minuet
+          path: Minuet
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
@@ -75,6 +80,11 @@ jobs:
         with:
           repository: Industrial-Algebra/Karpal
           path: karpal
+      - name: Checkout Minuet
+        uses: actions/checkout@v4
+        with:
+          repository: Industrial-Algebra/Minuet
+          path: Minuet
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
         with:
@@ -100,6 +110,11 @@ jobs:
         with:
           repository: Industrial-Algebra/Karpal
           path: karpal
+      - name: Checkout Minuet
+        uses: actions/checkout@v4
+        with:
+          repository: Industrial-Algebra/Minuet
+          path: Minuet
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
         with:
@@ -127,6 +142,11 @@ jobs:
         with:
           repository: Industrial-Algebra/Karpal
           path: karpal
+      - name: Checkout Minuet
+        uses: actions/checkout@v4
+        with:
+          repository: Industrial-Algebra/Minuet
+          path: Minuet
       - uses: dtolnay/rust-toolchain@nightly
         with:
           targets: wasm32-unknown-unknown
