@@ -179,9 +179,17 @@ Integrated with Karpal 0.5.0 verification infrastructure:
 - SMT-LIB2 and Lean 4 export support
 - CI: `.github/workflows/schubert-verify.yml`
 
-### 13. Distributed Access Control with CRDTs
+### 13. Distributed Access Control with CRDTs — ✅ DONE (v0.1.0)
 
-Operadic composition over a distributed system using conflict-free replicated data types. Principals hold vector clocks. Capability grants merge via geometric CRDT operations. The intersection number is computed from eventually-consistent state. This requires the Cliffy protocols geometric CRDT layer.
+**Implemented:** Eventually-consistent capability grants via CRDTs:
+- `CrdtState` — mergeable access control state with version vectors
+- `VersionVector` — happens-before comparison, merge (pointwise max)
+- `CrdtGrant` — last-write-wins grant with version tracking
+- `merge()` — commutative, associative, idempotent state merge
+- `check()` — access computation from eventually-consistent state
+
+**Verified:** 8 tests (happens-before, concurrent, grant/hold, revoke,
+merge-preserves, last-write-wins, idempotent, crdt-access-check).
 
 ### 14. Access Control for Holographic Memory
 

@@ -114,6 +114,8 @@ pub mod capability;
 pub mod composition;
 /// Access controller managing principals, capabilities, and checks.
 pub mod controller;
+/// Distributed access control via CRDTs.
+pub mod crdt;
 /// Cryptographic capability tokens (requires `crypto` feature).
 #[cfg(feature = "crypto")]
 pub mod crypto;
