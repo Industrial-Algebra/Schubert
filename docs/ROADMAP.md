@@ -193,13 +193,12 @@ Operadic composition over a distributed system using conflict-free replicated da
 
 ### 14. Access Control for Holographic Memory
 
-> **Note:** Blocked pending Minuet relicensing.
-
-Integration with Minuet-style holographic memory systems. Capabilities are
-binding vectors in a holographic reduced representation. Access is granted
-when the query vector's similarity to the capability vector exceeds the trust
-threshold. The wall-crossing engine determines which memories are accessible
-at each trust level.
+Integration with Minuet-style holographic memory systems (Minuet 0.3.0,
+AGPL-3.0 licensed). Capabilities are binding vectors in a holographic
+reduced representation. Access is granted when the query vector's
+similarity to the capability vector exceeds the trust threshold.
+The wall-crossing engine determines which memories are accessible at
+each trust level.
 
 ---
 
