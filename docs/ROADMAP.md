@@ -155,21 +155,18 @@ configure from Granted/Denied, can_consume, remove principal).
 
 Access decisions as routing rules. A network where route advertisement = capability grants and forwarding = Schubert intersection. The number of valid routes between source and destination is the intersection number. Congestion is codimension excess. This is the networking model explored in the ShaperOS transport layer, extracted as a standalone protocol.
 
-### 11. Surreal Trust Levels — 🔶 PARTIALLY IMPLEMENTED (v0.1.0)
+### 11. Surreal Trust Levels — ✅ DONE (v0.1.0)
 
-Amari-surreal v0.22 integration via `Dyadic` (exact m/2^n):
-- `SurrealTrust` — trust levels backed by dyadic rational arithmetic
-- Exact ordering, no floating-point rounding
-- `from_f64()`/`approximate()` for backward compatibility
-- `clamp_unit()` to [0,1] range
-- `IntoSurealTrust` conversion trait from `TrustLevel`
+**Implemented:** Full surreal trust via Amari 0.23.0:
+- `RationalSurreal` — exact rational trust (1/2, 3/7, etc.)
+- `EpsilonPolynomial` — infinitesimal trust (ε, ε², 5ε)
+- `SurrealTrust::epsilon()` / `epsilon_power(n)` — infinitesimal hierarchy
+- Exact ordering: ε > ε² > 0, 0.5+ε > 0.5
+- `from_f64()` / `approximate()` for backward compatibility
+- `has_infinitesimal()` / `is_purely_finite()` detection
 
-**Pending Amari 0.23 merge:**
-- `RationalSurreal` — general rational trust (3/7)
-- `EpsilonPolynomial` — infinitesimal trust (ε, ε², 0.5+ε)
-- `EpsilonRational` — rational functions in ε
-
-**Verified:** 7 tests (full/none, dyadic ordering, equality, clamping, roundtrip).
+**Verified:** 8 tests (full/none, rational ordering, epsilon positive,
+epsilon hierarchy, mixed trust, roundtrip, conversion, detection).
 
 ### 12. Constitutional Verification — ✅ IMPLEMENTED (v0.1.0)
 

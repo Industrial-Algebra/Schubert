@@ -35,8 +35,9 @@ ed25519-dalek = { version = "2", optional = true, features = ["rand_core"] }
 rand = { version = "0.8", optional = true }
 karpal-verify = { path = "../karpal/karpal-verify", optional = true }
 karpal-schubert-types = { path = "../karpal/karpal-schubert-types", optional = true }
-amari-surreal = { path = "../amari/amari-surreal", optional = true }
+amari-surreal = { path = "../amari/amari-surreal", optional = true, features = ["experimental-epsilon"] }
 num-traits = "0.2"
+num-bigint = "0.4"
 
 [dev-dependencies]
 

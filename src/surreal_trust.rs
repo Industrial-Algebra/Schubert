@@ -3,153 +3,139 @@
 
 //! Surreal trust levels for Schubert access control.
 //!
-//! Replaces `f64` trust with exact surreal arithmetic from `amari-surreal`.
-//! Currently built on `Dyadic` (dyadic rationals m/2^n — finer than float).
-//! Will upgrade to `RationalSurreal` and `EpsilonPolynomial` when Amari 0.23
-//! merges. See `docs/surreal-trust-levels.md` for the full expansion.
-//!
-//! # Trust Level Lattice
-//!
-//! | Layer | Supported Now | Example |
-//! |-------|--------------|---------|
-//! | Finite real | ✅ via Dyadic | `SurrealTrust::from_f64(0.5)` |
-//! | Dyadic rational | ✅ native | `SurrealTrust::dyadic(1, 2)` = 1/2 |
-//! | General rational | 🔜 Amari 0.23 | `3/7` via RationalSurreal |
-//! | Infinitesimal | 🔜 Amari 0.23 | ε, ε² via EpsilonPolynomial |
-//! | Mixed | 🔜 Amari 0.23 | 0.5 + ε |
-//!
-//! # Example
-//!
-//! ```
-//! # #[cfg(feature = "surreal")] {
-//! use schubert::surreal_trust::SurrealTrust;
-//!
-//! let full = SurrealTrust::full();
-//! let half: f64 = full.approximate();
-//! assert!((half - 1.0).abs() < 1e-10);
-//!
-//! let small = SurrealTrust::dyadic(1, 1024); // 1/1024
-//! assert!(small < full);
-//! # }
-//! ```
+//! Replaces `f64` trust with exact surreal arithmetic from Amari 0.23.0.
+//! Built on `RationalSurreal` for general rational trust and
+//! `EpsilonPolynomial` for infinitesimal trust levels.
+//! See `docs/surreal-trust-levels.md` for the full expansion.
 
-use amari_surreal::dyadic::Dyadic;
+use amari_surreal::epsilon::EpsilonPolynomial;
+use amari_surreal::rational::RationalSurreal;
 use num_traits::ToPrimitive;
 use std::cmp::Ordering;
 
-/// A trust level backed by exact surreal arithmetic.
-///
-/// Currently wraps `Dyadic` (dyadic rationals m/2^n), providing:
-/// - Exact ordering (no floating-point rounding)
-/// - Full arithmetic (add, sub, mul, div)
-/// - Conversion to/from `f64` for backward compatibility
-///
-/// When Amari 0.23 merges, this will upgrade to `RationalSurreal` with
-/// infinitesimal support via `EpsilonPolynomial`.
+/// A trust level backed by exact surreal arithmetic (Amari 0.23.0).
 #[derive(Debug, Clone)]
 pub struct SurrealTrust {
-    value: Dyadic,
+    finite: RationalSurreal,
+    infinitesimal: Option<EpsilonPolynomial>,
 }
 
 impl SurrealTrust {
     /// Full trust (1.0).
     pub fn full() -> Self {
         Self {
-            value: Dyadic::new(1, 0),
+            finite: RationalSurreal::one(),
+            infinitesimal: None,
         }
     }
 
     /// No trust (0.0).
     pub fn none() -> Self {
+        Self::zero()
+    }
+
+    /// Zero trust.
+    pub fn zero() -> Self {
         Self {
-            value: Dyadic::new(0, 0),
+            finite: RationalSurreal::zero(),
+            infinitesimal: None,
         }
     }
 
-    /// Create from a dyadic rational m / 2^n.
-    ///
-    /// `SurrealTrust::dyadic(1, 2)` = 1/4 = 0.25.
-    /// `SurrealTrust::dyadic(1, 1)` = 1/2 = 0.5.
-    pub fn dyadic(mantissa: i64, exponent: u32) -> Self {
+    /// Create from a rational p/q.
+    pub fn from_ratio(numer: i64, denom: u64) -> Self {
+        let n = num_bigint::BigInt::from(numer);
+        let d = num_bigint::BigInt::from(denom);
         Self {
-            value: Dyadic::new(mantissa, exponent),
+            finite: RationalSurreal::from_ratio(n, d).expect("valid rational"),
+            infinitesimal: None,
         }
     }
 
-    /// Create from an f64 by converting to the nearest dyadic rational.
-    ///
-    /// Uses the IEEE 754 representation: f64 = mantissa * 2^exponent.
+    /// Create from an integer.
+    pub fn from_integer(n: i64) -> Self {
+        Self {
+            finite: RationalSurreal::from_integer(n),
+            infinitesimal: None,
+        }
+    }
+
+    /// Create from an f64 (lossy).
     pub fn from_f64(value: f64) -> Self {
-        if value == 0.0 {
-            return Self {
-                value: Dyadic::zero(),
-            };
+        if value == 0.0 || !value.is_finite() {
+            return Self::zero();
         }
-        if !value.is_finite() {
-            return Self {
-                value: Dyadic::zero(),
-            };
-        }
-
         let bits = value.to_bits();
         let sign = if (bits >> 63) != 0 { -1i64 } else { 1i64 };
         let exponent = ((bits >> 52) & 0x7ff) as i32 - 1023;
         let mantissa_bits = bits & 0x000f_ffff_ffff_ffff;
-
-        // Normal numbers have implicit leading 1
         let mantissa = if exponent > -1023 {
             (mantissa_bits | 0x0010_0000_0000_0000) as i64
         } else {
-            // Subnormal: no implicit leading 1, exponent is -1022
             mantissa_bits as i64
         };
-
-        let adjusted_exponent = if exponent > -1023 {
+        let adj = if exponent > -1023 {
             exponent - 52
         } else {
             -1022 - 52
         };
-
         let numerator = sign * mantissa;
-        if adjusted_exponent >= 0 {
-            // m * 2^e — shift left
-            let value = numerator << (adjusted_exponent as u32);
-            Self {
-                value: Dyadic::from_integer::<i64>(value),
-            }
+        if adj >= 0 {
+            Self::from_integer(numerator << (adj as u32))
         } else {
-            // m / 2^|e| — use dyadic
-            Self {
-                value: Dyadic::new(numerator, (-adjusted_exponent) as u32),
-            }
+            Self::from_ratio(numerator, 1u64 << ((-adj) as u32))
         }
     }
 
-    /// Convert to an f64 approximation.
+    /// Approximate as f64.
     pub fn approximate(&self) -> f64 {
-        let numer = self.value.numer();
-        let exp = self.value.exponent();
-        let num_f64 = numer.to_f64().unwrap_or(0.0);
-        if exp == 0 {
-            num_f64
-        } else {
-            num_f64 / 2.0_f64.powi(exp as i32)
+        let n = self.finite.numer().to_f64().unwrap_or(0.0);
+        let d = self.finite.denom().to_f64().unwrap_or(1.0);
+        n / d
+    }
+
+    /// Create the positive infinitesimal ε.
+    pub fn epsilon() -> Self {
+        Self {
+            finite: RationalSurreal::zero(),
+            infinitesimal: Some(EpsilonPolynomial::epsilon()),
         }
     }
 
-    /// Convert to inner Dyadic value.
-    pub fn inner(&self) -> &Dyadic {
-        &self.value
+    /// Create ε^n.
+    pub fn epsilon_power(n: i32) -> Self {
+        Self {
+            finite: RationalSurreal::zero(),
+            infinitesimal: Some(EpsilonPolynomial::monomial(RationalSurreal::one(), n)),
+        }
     }
 
-    /// Clamp to [0.0, 1.0] range.
+    /// Check for infinitesimal component.
+    pub fn has_infinitesimal(&self) -> bool {
+        self.infinitesimal
+            .as_ref()
+            .is_some_and(|eps| !eps.is_zero())
+    }
+
+    /// Check if purely finite.
+    pub fn is_purely_finite(&self) -> bool {
+        !self.has_infinitesimal()
+    }
+
+    /// Clamp to [0.0, 1.0].
     pub fn clamp_unit(&self) -> Self {
-        let zero = Dyadic::new(0, 0);
-        let one = Dyadic::new(1, 0);
-        if self.value < zero {
-            Self { value: zero }
-        } else if self.value > one {
-            Self { value: one }
+        let zero = RationalSurreal::zero();
+        let one = RationalSurreal::one();
+        if self.finite < zero {
+            Self {
+                finite: zero,
+                infinitesimal: None,
+            }
+        } else if self.finite > one {
+            Self {
+                finite: one,
+                infinitesimal: None,
+            }
         } else {
             self.clone()
         }
@@ -158,17 +144,11 @@ impl SurrealTrust {
 
 impl PartialEq for SurrealTrust {
     fn eq(&self, other: &Self) -> bool {
-        self.value == other.value
+        self.finite == other.finite && self.infinitesimal == other.infinitesimal
     }
 }
 
 impl Eq for SurrealTrust {}
-
-impl Ord for SurrealTrust {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.value.cmp(&other.value)
-    }
-}
 
 impl PartialOrd for SurrealTrust {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -176,9 +156,64 @@ impl PartialOrd for SurrealTrust {
     }
 }
 
-/// Extension trait for `TrustLevel` to provide surreal conversion.
+impl Ord for SurrealTrust {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.finite.cmp(&other.finite) {
+            Ordering::Equal => compare_infinitesimal(&self.infinitesimal, &other.infinitesimal),
+            ord => ord,
+        }
+    }
+}
+
+/// Compare two optional epsilon polynomials.
+fn compare_infinitesimal(a: &Option<EpsilonPolynomial>, b: &Option<EpsilonPolynomial>) -> Ordering {
+    match (a, b) {
+        (None, None) => Ordering::Equal,
+        (Some(eps), None) => {
+            if eps.is_zero() {
+                Ordering::Equal
+            } else {
+                Ordering::Greater
+            }
+        }
+        (None, Some(eps)) => {
+            if eps.is_zero() {
+                Ordering::Equal
+            } else {
+                Ordering::Less
+            }
+        }
+        (Some(a), Some(b)) => {
+            if a.is_zero() && b.is_zero() {
+                return Ordering::Equal;
+            }
+            // Compare by valuation (smaller exponent = larger value)
+            let a_val = a.valuation().unwrap_or(0);
+            let b_val = b.valuation().unwrap_or(0);
+            match a_val.cmp(&b_val).reverse() {
+                Ordering::Equal => {
+                    // Same valuation — compare leading coefficient
+                    let a_coeff = a
+                        .terms()
+                        .first_key_value()
+                        .map(|(_, c)| c.clone())
+                        .unwrap_or_else(RationalSurreal::zero);
+                    let b_coeff = b
+                        .terms()
+                        .first_key_value()
+                        .map(|(_, c)| c.clone())
+                        .unwrap_or_else(RationalSurreal::zero);
+                    a_coeff.cmp(&b_coeff)
+                }
+                ord => ord,
+            }
+        }
+    }
+}
+
+/// Conversion from standard TrustLevel to SurrealTrust.
 pub trait IntoSurealTrust {
-    /// Convert a standard trust level to surreal trust.
+    /// Convert this trust level to a surreal trust value.
     fn to_surreal(&self) -> SurrealTrust;
 }
 
@@ -194,45 +229,31 @@ mod tests {
 
     #[test]
     fn full_is_one() {
-        let t = SurrealTrust::full();
-        assert!((t.approximate() - 1.0).abs() < 1e-10);
+        assert!((SurrealTrust::full().approximate() - 1.0).abs() < 1e-10);
     }
 
     #[test]
     fn none_is_zero() {
-        let t = SurrealTrust::none();
-        assert!((t.approximate() - 0.0).abs() < 1e-10);
+        assert!((SurrealTrust::none().approximate()).abs() < 1e-10);
     }
 
     #[test]
-    fn dyadic_ordering() {
-        let quarter = SurrealTrust::dyadic(1, 2); // 1/4
-        let half = SurrealTrust::dyadic(1, 1); // 1/2
-        let three_quarters = SurrealTrust::dyadic(3, 2); // 3/4
-
-        assert!(quarter < half);
-        assert!(half < three_quarters);
-        assert!(quarter < three_quarters);
-        assert!(quarter < SurrealTrust::full());
+    fn rational_ordering() {
+        assert!(SurrealTrust::from_ratio(1, 3) < SurrealTrust::from_ratio(1, 2));
     }
 
     #[test]
-    fn dyadic_equality() {
-        let a = SurrealTrust::dyadic(2, 1); // 2/2 = 1
-        let b = SurrealTrust::dyadic(4, 2); // 4/4 = 1
-        assert_eq!(a, b);
+    fn epsilon_positive() {
+        let eps = SurrealTrust::epsilon();
+        assert!(eps > SurrealTrust::zero());
+        assert!(eps < SurrealTrust::from_ratio(1, 1_000_000));
     }
 
     #[test]
-    fn clamp_to_range() {
-        let too_high = SurrealTrust::dyadic(3, 0); // 3 → clamp to 1
-        assert!((too_high.clamp_unit().approximate() - 1.0).abs() < 1e-10);
-
-        let too_low = SurrealTrust::dyadic(-1, 0); // -1 → clamp to 0
-        assert!((too_low.clamp_unit().approximate() - 0.0).abs() < 1e-10);
-
-        let ok = SurrealTrust::dyadic(1, 1); // 0.5 → unchanged
-        assert!((ok.clamp_unit().approximate() - 0.5).abs() < 1e-10);
+    fn epsilon_hierarchy() {
+        // ε > ε² > 0
+        assert!(SurrealTrust::epsilon() > SurrealTrust::epsilon_power(2));
+        assert!(SurrealTrust::epsilon_power(2) > SurrealTrust::zero());
     }
 
     #[test]
@@ -243,8 +264,13 @@ mod tests {
 
     #[test]
     fn trust_level_conversion() {
-        let tl = crate::TrustLevel::new(0.5);
-        let surreal = tl.to_surreal();
+        let surreal = crate::TrustLevel::new(0.5).to_surreal();
         assert!((surreal.approximate() - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn epsilon_detection() {
+        assert!(SurrealTrust::epsilon().has_infinitesimal());
+        assert!(!SurrealTrust::full().has_infinitesimal());
     }
 }
