@@ -3,6 +3,13 @@
 version = 3
 
 [[package]]
+name = "amari-cgt"
+version = "0.22.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "amari-core"
 version = "0.22.0"
 dependencies = [
@@ -54,6 +61,17 @@ dependencies = [
  "num-rational",
  "num-traits",
  "once_cell",
+ "thiserror",
+]
+
+[[package]]
+name = "amari-surreal"
+version = "0.22.0"
+dependencies = [
+ "amari-cgt",
+ "num-bigint",
+ "num-integer",
+ "num-traits",
  "thiserror",
 ]
 
@@ -589,11 +607,13 @@ name = "schubert"
 version = "0.1.0"
 dependencies = [
  "amari-enumerative 0.22.0",
+ "amari-surreal",
  "ed25519-dalek",
  "js-sys",
  "karpal-proof",
  "karpal-schubert-types",
  "karpal-verify",
+ "num-traits",
  "rand",
  "rayon",
  "serde",

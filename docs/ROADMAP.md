@@ -155,21 +155,21 @@ configure from Granted/Denied, can_consume, remove principal).
 
 Access decisions as routing rules. A network where route advertisement = capability grants and forwarding = Schubert intersection. The number of valid routes between source and destination is the intersection number. Congestion is codimension excess. This is the networking model explored in the ShaperOS transport layer, extracted as a standalone protocol.
 
-### 11. Surreal Trust Levels
+### 11. Surreal Trust Levels — 🔶 PARTIALLY IMPLEMENTED (v0.1.0)
 
-Amari 0.23.0 provides `RationalSurreal` — exact rational surreal numbers
-with infinitesimal support via `EpsilonPolynomial` (`amari-surreal` with
-`experimental-epsilon` feature). Trust levels become surreal-valued:
+Amari-surreal v0.22 integration via `Dyadic` (exact m/2^n):
+- `SurrealTrust` — trust levels backed by dyadic rational arithmetic
+- Exact ordering, no floating-point rounding
+- `from_f64()`/`approximate()` for backward compatibility
+- `clamp_unit()` to [0,1] range
+- `IntoSurealTrust` conversion trait from `TrustLevel`
 
-| Layer | Example | Meaning |
-|-------|---------|--------|
-| Finite real | `0.5` | Standard trust |
-| General rational | `3/7` | Exact, no floating-point artifacts |
-| Infinitesimal | `ε`, `ε²` | Distinct levels within the infinitesimal |
-| Mixed | `0.5 + ε` | Half trust plus a shred |
+**Pending Amari 0.23 merge:**
+- `RationalSurreal` — general rational trust (3/7)
+- `EpsilonPolynomial` — infinitesimal trust (ε, ε², 0.5+ε)
+- `EpsilonRational` — rational functions in ε
 
-The wall-crossing engine generalizes naturally — the phase φ(t) formula
-is analytic in t. See `docs/surreal-trust-levels.md` for the full expansion.
+**Verified:** 7 tests (full/none, dyadic ordering, equality, clamping, roundtrip).
 
 ### 12. Constitutional Verification — ✅ IMPLEMENTED (v0.1.0)
 
