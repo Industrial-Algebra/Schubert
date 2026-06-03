@@ -5,17 +5,6 @@ version = 3
 [[package]]
 name = "amari-core"
 version = "0.22.0"
-dependencies = [
- "approx",
- "bytemuck",
- "dashu-float",
- "num-traits",
- "thiserror",
-]
-
-[[package]]
-name = "amari-core"
-version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "169b6a42bab767903e32ee9302b7cf75993d63add5f1e24660c1dac1082aa958"
 dependencies = [
@@ -27,10 +16,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "amari-core"
+version = "0.23.0"
+dependencies = [
+ "approx",
+ "bytemuck",
+ "dashu-float",
+ "num-traits",
+ "thiserror",
+]
+
+[[package]]
 name = "amari-enumerative"
 version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd44e016f160dbac33ee98449b051dd566d04060cf88c0d4190d3e3f2b07f512"
 dependencies = [
  "amari-core 0.22.0",
+ "num-bigint",
+ "num-rational",
+ "num-traits",
+ "once_cell",
+ "thiserror",
+]
+
+[[package]]
+name = "amari-enumerative"
+version = "0.23.0"
+dependencies = [
+ "amari-core 0.23.0",
  "js-sys",
  "num-bigint",
  "num-rational",
@@ -41,20 +55,6 @@ dependencies = [
  "thiserror",
  "wasm-bindgen",
  "web-sys",
-]
-
-[[package]]
-name = "amari-enumerative"
-version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd44e016f160dbac33ee98449b051dd566d04060cf88c0d4190d3e3f2b07f512"
-dependencies = [
- "amari-core 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "num-bigint",
- "num-rational",
- "num-traits",
- "once_cell",
- "thiserror",
 ]
 
 [[package]]
@@ -388,7 +388,7 @@ dependencies = [
 name = "karpal-schubert-types"
 version = "0.5.0"
 dependencies = [
- "amari-enumerative 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "amari-enumerative 0.22.0",
  "karpal-algebra",
  "karpal-core",
  "karpal-verify",
@@ -588,7 +588,7 @@ checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 name = "schubert"
 version = "0.1.0"
 dependencies = [
- "amari-enumerative 0.22.0",
+ "amari-enumerative 0.23.0",
  "ed25519-dalek",
  "js-sys",
  "karpal-proof",

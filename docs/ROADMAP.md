@@ -151,9 +151,17 @@ configure from Granted/Denied, can_consume, remove principal).
 
 ## Far-Term (Speculative)
 
-### 10. Schubert Routing
+### 10. Schubert Routing — ✅ DONE (v0.1.0)
 
-Access decisions as routing rules. A network where route advertisement = capability grants and forwarding = Schubert intersection. The number of valid routes between source and destination is the intersection number. Congestion is codimension excess. This is the networking model explored in the ShaperOS transport layer, extracted as a standalone protocol.
+**Implemented:** Geometric network routing via Schubert calculus:
+- `RouteTable` — manages route advertisements as Schubert conditions
+- `RouteAdvertisement` — partition + hop count per node
+- `check_route()` / `check_path()` — single-hop and multi-hop path computation
+- `congestion_level()` — codimension/dimension ratio for congestion detection
+- Intersection number = valid route count
+
+**Verified:** 7 tests (single hop, congested, impossible, multi-hop,
+congestion level, missing node, node listing).
 
 ### 11. Surreal Trust Levels
 
