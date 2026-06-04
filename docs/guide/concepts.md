@@ -92,3 +92,21 @@ This models service chaining: service A produces output that service B consumes.
 - σ₂·σ₁₁ = 0 — write + internal-audit is geometrically impossible
 - Composition is commutative (grant order doesn't matter)
 - Grant-revoke identity (grant then revoke = no change)
+
+## References
+
+### Grassmannians and Schubert Calculus
+- [Grassmannian — Wikipedia](https://en.wikipedia.org/wiki/Grassmannian)
+- [Schubert calculus — Wikipedia](https://en.wikipedia.org/wiki/Schubert_calculus)
+- [Littlewood-Richardson rule — Wikipedia](https://en.wikipedia.org/wiki/Littlewood%E2%80%93Richardson_rule)
+- [Schubert variety — Wolfram MathWorld](https://mathworld.wolfram.com/SchubertVariety.html)
+
+### Access Control
+- [Capability-based security — Wikipedia](https://en.wikipedia.org/wiki/Capability-based_security)
+- [Attribute-based access control — Wikipedia](https://en.wikipedia.org/wiki/Attribute-based_access_control)
+- [Role-based access control — NIST](https://csrc.nist.gov/projects/role-based-access-control)
+
+### Industrial Algebra Ecosystem
+- [Amari — Schubert calculus engine](https://github.com/Industrial-Algebra/Amari)
+- [Karpal — Proof and verification](https://github.com/Industrial-Algebra/Karpal)
+- [Minuet — Holographic memory](https://github.com/Industrial-Algebra/Minuet)
