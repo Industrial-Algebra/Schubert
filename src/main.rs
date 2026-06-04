@@ -103,7 +103,7 @@ fn main() {
         }
 
         Commands::Recommend { input } => {
-            let recommendation = if let Some(input_path) = input {
+            let recommendation = if let Some(_input_path) = input {
                 #[cfg(not(feature = "policy"))]
                 {
                     eprintln!("Error: --input requires the 'policy' feature. Rebuild with --features policy");

@@ -1,5 +1,12 @@
 # Critique of the Schubert Library
 
+> **v0.1.0 Snapshot** — This document reflects the state of the project at its
+> initial public release. Several points raised here have since been addressed:
+> a [CLI](docs/guide/cli.md) now exists, the project is [dual-licensed](LICENSE-COMMERCIAL),
+> and [comprehensive documentation](docs/guide/) has been written. We keep this
+> critique public as an honest record of the project's starting point and a
+> benchmark for future improvement.
+
 ## Overview
 Schubert is a Rust library that replaces binary allow/deny access‑control with a *quantitative* model based on Schubert calculus.  While the concept is mathematically elegant and the implementation is solid, several practical concerns limit its suitability for mainstream commercial use.
 
