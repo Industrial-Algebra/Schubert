@@ -5,6 +5,8 @@ version = 3
 [[package]]
 name = "amari-cgt"
 version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94daf10f711f4ec1de07717becdfcf17f290db843cf42efa2cf18e7558fb4b14"
 dependencies = [
  "thiserror",
 ]
@@ -25,6 +27,8 @@ dependencies = [
 [[package]]
 name = "amari-core"
 version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4604466370c01bb3453e1fa51a67477727770fbb77898c9dc04b7c974a7e0bbf"
 dependencies = [
  "approx",
  "bytemuck",
@@ -50,6 +54,8 @@ dependencies = [
 [[package]]
 name = "amari-enumerative"
 version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3dd9a85f4a68790632e4f09884004ce020b5a006033d1756cf3346024e856b6"
 dependencies = [
  "amari-core 0.23.0",
  "js-sys",
@@ -67,6 +73,8 @@ dependencies = [
 [[package]]
 name = "amari-surreal"
 version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc712296436f755a9e09a9f829978d7a06dfc79881ef3624735d60b048668744"
 dependencies = [
  "amari-cgt",
  "num-bigint",
@@ -377,6 +385,8 @@ dependencies = [
 [[package]]
 name = "karpal-algebra"
 version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "015423e85d8778d4ee91a89d3fa8cd5e12b0d5ea8e432527172e2b06a07ee29e"
 dependencies = [
  "karpal-core",
 ]
@@ -384,10 +394,14 @@ dependencies = [
 [[package]]
 name = "karpal-core"
 version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2df04b5af9bde122fee5d7359cd15afedcbcdd54a2e4b969446fd8e5430ca656"
 
 [[package]]
 name = "karpal-proof"
 version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a51d84a83dc578ccac1ed5cad493825427f129ffeabebe46b89febeed7fa6285"
 dependencies = [
  "karpal-algebra",
  "karpal-core",
@@ -397,6 +411,8 @@ dependencies = [
 [[package]]
 name = "karpal-proof-derive"
 version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aba2d03289e10dd05fabee5658ff17fbca9aa2440d458d7b5beda9b7cec30b5f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -406,6 +422,8 @@ dependencies = [
 [[package]]
 name = "karpal-schubert-types"
 version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c80a15bdc2add363a4e8633750562faf23ba235c22ac411a969b7c9946765eba"
 dependencies = [
  "amari-enumerative 0.22.0",
  "karpal-algebra",
@@ -416,6 +434,8 @@ dependencies = [
 [[package]]
 name = "karpal-verify"
 version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8a5b29e036beeac069fd35ea652e00a8fae3b318a043c5f9e1c5f9d9f159284"
 dependencies = [
  "karpal-proof",
  "karpal-verify-derive",
@@ -424,6 +444,8 @@ dependencies = [
 [[package]]
 name = "karpal-verify-derive"
 version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eef48c66632586152e59433db9e68bf8bee1f25b70c09623eaf7511dfe1adbc6"
 dependencies = [
  "proc-macro2",
  "quote",
