@@ -63,6 +63,7 @@ The Grassmannian Gr(2,4) has dimension 4 and is the standard configuration for R
 - [Feature Flags](docs/guide/feature-flags.md) — available optional features
 - [ROADMAP](docs/ROADMAP.md) — completed and speculative directions
 - [CHANGELOG](CHANGELOG.md) — version history
+- [CLI Guide](docs/guide/cli.md) — discovery CLI for LLM agents
 
 ## Quick Start
 
