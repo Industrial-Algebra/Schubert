@@ -27,6 +27,11 @@ jobs:
         with:
           repository: Industrial-Algebra/Karpal
           path: karpal
+      - name: Checkout Minuet
+        uses: actions/checkout@v4
+        with:
+          repository: Industrial-Algebra/Minuet
+          path: Minuet
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
         with:

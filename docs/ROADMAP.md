@@ -196,7 +196,7 @@ Integrated with Karpal 0.5.0 verification infrastructure:
 **Verified:** 8 tests (happens-before, concurrent, grant/hold, revoke,
 merge-preserves, last-write-wins, idempotent, crdt-access-check).
 
-### 14. Access Control for Holographic Memory
+### 14. Access Control for Holographic Memory — ✅ DONE (v0.1.0)
 
 Integration with Minuet-style holographic memory systems (Minuet 0.3.0,
 AGPL-3.0 licensed). Capabilities are binding vectors in a holographic
