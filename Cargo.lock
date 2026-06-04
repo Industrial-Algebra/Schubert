@@ -3,16 +3,10 @@
 version = 3
 
 [[package]]
-name = "amari-core"
-version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8968d2758cd5f264956993018de04972277970da04df1672bfe0e333cee5727"
+name = "amari-cgt"
+version = "0.23.0"
 dependencies = [
- "approx",
- "bytemuck",
- "dashu-float",
- "num-traits",
- "thiserror 1.0.69",
+ "thiserror",
 ]
 
 [[package]]
@@ -36,7 +30,7 @@ dependencies = [
  "bytemuck",
  "dashu-float",
  "num-traits",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -50,7 +44,7 @@ dependencies = [
  "num-rational",
  "num-traits",
  "once_cell",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -62,27 +56,19 @@ dependencies = [
  "num-bigint",
  "num-rational",
  "num-traits",
- "once_cell",
- "rayon",
- "serde",
  "thiserror 2.0.18",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
-name = "amari-holographic"
-version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38fcc9b733577199862d3779a74438562647b9dd52702246fda48ce0e2b0a0b5"
+name = "amari-surreal"
+version = "0.23.0"
 dependencies = [
- "amari-core 0.15.1",
- "fastrand",
+ "amari-cgt",
+ "num-bigint",
+ "num-integer",
+ "num-rational",
  "num-traits",
- "rand",
- "rand_chacha",
- "serde",
- "thiserror 1.0.69",
+ "thiserror",
 ]
 
 [[package]]
@@ -702,12 +688,14 @@ name = "schubert"
 version = "0.1.0"
 dependencies = [
  "amari-enumerative 0.23.0",
+ "amari-surreal",
  "ed25519-dalek",
  "js-sys",
  "karpal-proof",
  "karpal-schubert-types",
  "karpal-verify",
- "minuet",
+ "num-bigint",
+ "num-traits",
  "rand",
  "rayon",
  "serde",
