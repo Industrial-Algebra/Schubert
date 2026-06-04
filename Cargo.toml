@@ -12,7 +12,7 @@ categories = ["authentication", "mathematics", "data-structures"]
 [features]
 default = ["std"]
 std = []
-serde = ["dep:serde", "dep:serde_json", "amari-enumerative/serde"]
+serde = ["amari-enumerative/serde"]
 karpal = ["dep:karpal-proof"]
 parallel = ["dep:rayon", "amari-enumerative/parallel"]
 policy = ["serde", "dep:toml"]
@@ -23,10 +23,11 @@ holographic = ["dep:minuet"]
 surreal = ["dep:amari-surreal"]
 
 [dependencies]
+clap = { version = "4", features = ["derive"] }
 amari-enumerative = { version = "0.23", features = ["tropical-schubert"] }
 thiserror = "2"
-serde = { version = "1", optional = true, features = ["derive"] }
-serde_json = { version = "1", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 karpal-proof = { version = "0.5", optional = true }
 rayon = { version = "1", optional = true }
 toml = { version = "0.8", optional = true }
