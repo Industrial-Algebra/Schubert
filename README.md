@@ -54,6 +54,16 @@ The Grassmannian Gr(2,4) has dimension 4 and is the standard configuration for R
 | σ₂₂ | 1 | The point class — a single admin configuration |
 | σ₁·σ₂₁ | 1 | A read + admin combo yields exactly 1 configuration |
 
+## Documentation
+
+- [Getting Started](docs/guide/getting-started.md) — installation and first controller
+- [Concepts](docs/guide/concepts.md) — mathematical foundation
+- [Architecture](docs/guide/architecture.md) — module map and data flow
+- [Cookbook](docs/guide/cookbook.md) — integration recipes (OAuth, JWT, databases)
+- [Feature Flags](docs/guide/feature-flags.md) — available optional features
+- [ROADMAP](docs/ROADMAP.md) — completed and speculative directions
+- [CHANGELOG](CHANGELOG.md) — version history
+
 ## Quick Start
 
 ```rust
