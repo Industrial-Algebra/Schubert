@@ -114,6 +114,8 @@ pub mod capability;
 pub mod composition;
 /// Access controller managing principals, capabilities, and checks.
 pub mod controller;
+/// Distributed access control via CRDTs.
+pub mod crdt;
 /// Cryptographic capability tokens (requires `crypto` feature).
 #[cfg(feature = "crypto")]
 pub mod crypto;
@@ -133,6 +135,8 @@ pub mod principal;
 pub mod proof;
 /// Quantitative rate limiting via Schubert intersection numbers.
 pub mod rate_limit;
+/// Geometric network routing via Schubert calculus.
+pub mod routing;
 pub mod stability;
 /// Surreal trust levels (requires `surreal` feature).
 #[cfg(feature = "surreal")]

@@ -151,9 +151,17 @@ configure from Granted/Denied, can_consume, remove principal).
 
 ## Far-Term (Speculative)
 
-### 10. Schubert Routing
+### 10. Schubert Routing — ✅ DONE (v0.1.0)
 
-Access decisions as routing rules. A network where route advertisement = capability grants and forwarding = Schubert intersection. The number of valid routes between source and destination is the intersection number. Congestion is codimension excess. This is the networking model explored in the ShaperOS transport layer, extracted as a standalone protocol.
+**Implemented:** Geometric network routing via Schubert calculus:
+- `RouteTable` — manages route advertisements as Schubert conditions
+- `RouteAdvertisement` — partition + hop count per node
+- `check_route()` / `check_path()` — single-hop and multi-hop path computation
+- `congestion_level()` — codimension/dimension ratio for congestion detection
+- Intersection number = valid route count
+
+**Verified:** 7 tests (single hop, congested, impossible, multi-hop,
+congestion level, missing node, node listing).
 
 ### 11. Surreal Trust Levels — ✅ DONE (v0.1.0)
 
@@ -176,19 +184,26 @@ Integrated with Karpal 0.5.0 verification infrastructure:
 - SMT-LIB2 and Lean 4 export support
 - CI: `.github/workflows/schubert-verify.yml`
 
-### 13. Distributed Access Control with CRDTs
+### 13. Distributed Access Control with CRDTs — ✅ DONE (v0.1.0)
 
-Operadic composition over a distributed system using conflict-free replicated data types. Principals hold vector clocks. Capability grants merge via geometric CRDT operations. The intersection number is computed from eventually-consistent state. This requires the Cliffy protocols geometric CRDT layer.
+**Implemented:** Eventually-consistent capability grants via CRDTs:
+- `CrdtState` — mergeable access control state with version vectors
+- `VersionVector` — happens-before comparison, merge (pointwise max)
+- `CrdtGrant` — last-write-wins grant with version tracking
+- `merge()` — commutative, associative, idempotent state merge
+- `check()` — access computation from eventually-consistent state
+
+**Verified:** 8 tests (happens-before, concurrent, grant/hold, revoke,
+merge-preserves, last-write-wins, idempotent, crdt-access-check).
 
 ### 14. Access Control for Holographic Memory
 
-> **Note:** Blocked pending Minuet relicensing.
-
-Integration with Minuet-style holographic memory systems. Capabilities are
-binding vectors in a holographic reduced representation. Access is granted
-when the query vector's similarity to the capability vector exceeds the trust
-threshold. The wall-crossing engine determines which memories are accessible
-at each trust level.
+Integration with Minuet-style holographic memory systems (Minuet 0.3.0,
+AGPL-3.0 licensed). Capabilities are binding vectors in a holographic
+reduced representation. Access is granted when the query vector's
+similarity to the capability vector exceeds the trust threshold.
+The wall-crossing engine determines which memories are accessible at
+each trust level.
 
 ---
 
