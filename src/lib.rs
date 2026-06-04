@@ -133,6 +133,8 @@ pub mod principal;
 pub mod proof;
 /// Quantitative rate limiting via Schubert intersection numbers.
 pub mod rate_limit;
+/// Geometric network routing via Schubert calculus.
+pub mod routing;
 pub mod stability;
 /// Surreal trust levels (requires `surreal` feature).
 #[cfg(feature = "surreal")]
