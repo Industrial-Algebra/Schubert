@@ -163,21 +163,18 @@ configure from Granted/Denied, can_consume, remove principal).
 **Verified:** 7 tests (single hop, congested, impossible, multi-hop,
 congestion level, missing node, node listing).
 
-### 11. Surreal Trust Levels
+### 11. Surreal Trust Levels — ✅ DONE (v0.1.0)
 
-Amari 0.23.0 provides `RationalSurreal` — exact rational surreal numbers
-with infinitesimal support via `EpsilonPolynomial` (`amari-surreal` with
-`experimental-epsilon` feature). Trust levels become surreal-valued:
+**Implemented:** Full surreal trust via Amari 0.23.0:
+- `RationalSurreal` — exact rational trust (1/2, 3/7, etc.)
+- `EpsilonPolynomial` — infinitesimal trust (ε, ε², 5ε)
+- `SurrealTrust::epsilon()` / `epsilon_power(n)` — infinitesimal hierarchy
+- Exact ordering: ε > ε² > 0, 0.5+ε > 0.5
+- `from_f64()` / `approximate()` for backward compatibility
+- `has_infinitesimal()` / `is_purely_finite()` detection
 
-| Layer | Example | Meaning |
-|-------|---------|--------|
-| Finite real | `0.5` | Standard trust |
-| General rational | `3/7` | Exact, no floating-point artifacts |
-| Infinitesimal | `ε`, `ε²` | Distinct levels within the infinitesimal |
-| Mixed | `0.5 + ε` | Half trust plus a shred |
-
-The wall-crossing engine generalizes naturally — the phase φ(t) formula
-is analytic in t. See `docs/surreal-trust-levels.md` for the full expansion.
+**Verified:** 8 tests (full/none, rational ordering, epsilon positive,
+epsilon hierarchy, mixed trust, roundtrip, conversion, detection).
 
 ### 12. Constitutional Verification — ✅ IMPLEMENTED (v0.1.0)
 

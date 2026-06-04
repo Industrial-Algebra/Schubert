@@ -19,32 +19,36 @@ Schubert is **not** an authentication system, a network service, or a replacemen
 
 ## Current State
 
-### Tests: 39 passing (with all features), 0 failing
+### Tests: 98 passing (with all features), 0 failing
 ```
-unit tests:     39 passed (controller, composition, phantom, proof, parallel)
-doc tests:       7 passed
-examples:        3 compile and run
+unit tests:     98 passed (controller, composition, phantom, proof, multi, policy, crypto, verify, rate_limit)
+doc tests:      11 passed
+examples:        7 compile and run
 clippy:          0 warnings (all feature combos)
 ```
 
 ### Feature Gated
-- `std` (default) — HashMap, SystemTime, thread-safe audit
-- `serde` — Serialize/Deserialize on 11 key types
-- `karpal` — `schubert::proof` module with compile-time verification
-- `parallel` — Batch operations: `check_batch`, `stability_batch`, `compose_batch`
+| Feature | What It Enables |
+|---------|----------------|
+| `std` (default) | HashMap, SystemTime, thread-safe audit |
+| `serde` | Serialize/Deserialize on all key types + JSON I/O |
+| `karpal` | `proof` module with compile-time verification |
+| `parallel` | Batch operations via rayon |
+| `policy` | Declarative TOML policy language |
+| `wasm` | wasm-bindgen JavaScript bindings |
+| `crypto` | Ed25519 capability tokens |
+| `karpal-verify` | Formal verification via karpal-verify 0.5.0 |
 
 ### Implemented
-- `AccessController` — main entry point. Create principals, register/grant/revoke capabilities, check access. Batch operations: `check_batch`, `stability_batch`, `compose_batch` (requires `parallel` feature)
-- `Capability` — Schubert condition with partition, kind (ReadLike/WriteLike/AdminLike/Custom), label, description
-- `Principal` — wraps amari `Namespace`. Identity is external (string ID)
-- `AccessDecision` — `Granted{n, path} | Impossible{conflicting} | Denied | Underconstrained{dim}`
-- `ComputationPath` — LittlewoodRichardson, Localization, Tropical, Matroid
-- Operadic composition — `compose()`, `are_composable()`
-- Stability analysis — `analyze_stability()`, `stable_capabilities_at()`, wall-crossing phase diagrams
-- Audit — pluggable `AuditSink` trait, `InMemoryAudit`, `DecisionRecord`
-- Examples: rbac (Kubernetes roles), api_gateway (OAuth scope conflict), row_security (multi-tenant DB)
-- **Karpal integration** — `proof` module with Proven wrappers, Property hierarchy, Rewrite rules, law checks
-- Docs: README, module-level docs for all 10 modules, method docs on every public function, `docs/ROADMAP.md`, `docs/surreal-trust-levels.md`
+- `AccessController` — main entry point with temporal access, context-aware decisions, batch ops
+- `Capability` — timed expiry, builder pattern, resource scoping
+- `MultiController` — multi-Grassmannian cross-domain access
+- `RateLimiter` — token-bucket rate limiting scaled by intersection numbers
+- `WasmController` — wasm-bindgen JavaScript bindings
+- Cryptographic tokens — Ed25519-signed `CapabilityToken` with `CapabilityIssuer`/`CapabilityVerifier`
+- Policy language — TOML format with validation and roundtrip
+- Verification — Karpal 0.5.0 obligation bundles, certified trust boundary
+- Examples: rbac, api_gateway, row_security, policy_loader, cross_domain, context_aware, rate_limiter
 
 ### Fundamental Checks Verified
 - σ₁⁴ = 2 in Gr(2,4) ✅

@@ -136,6 +136,9 @@ pub mod rate_limit;
 /// Geometric network routing via Schubert calculus.
 pub mod routing;
 pub mod stability;
+/// Surreal trust levels (requires `surreal` feature).
+#[cfg(feature = "surreal")]
+pub mod surreal_trust;
 /// Schubert calculus verification via Karpal (future: requires `karpal-verify`).
 #[cfg(feature = "karpal-verify")]
 pub mod verify;
