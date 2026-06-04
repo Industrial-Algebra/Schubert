@@ -61,3 +61,7 @@ path = "examples/cross_domain.rs"
 [[example]]
 name = "context_aware"
 path = "examples/context_aware.rs"
+
+[[example]]
+name = "rate_limiter"
+path = "examples/rate_limiter.rs"
