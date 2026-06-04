@@ -292,6 +292,74 @@ mc.grant_in_domain(&alice, "read", &gr24)?;
 mc.check_cross_domain(&alice, &["read"], &gr24, &gr36)?;
 ```
 
+## Temporal Access Control
+
+Capabilities can carry an expiry timestamp. Access checks at a given time
+treat expired capabilities as denied:
+
+```rust
+let cap = Capability::new("temp", "Temporary", vec![1], CapabilityKind::ReadLike)
+    .with_expiry(now + 3600_000); // expires in 1 hour
+
+acl.check_temporal(&alice, &["temp"], now)?;      // OK
+acl.check_temporal(&alice, &["temp"], later)?;     // Denied (expired)
+
+// Query expiry state
+let expired = acl.expired_capabilities(&alice, now)?;
+let remaining = acl.capability_time_remaining(&alice, now)?;
+```
+
+Trust decays linearly from full (1.0) at grant time to zero at expiry,
+integrating with the wall-crossing stability engine.
+
+## Rate Limiting
+
+Token-bucket rate limiting scaled by Schubert intersection numbers:
+
+```rust
+use schubert::RateLimiter;
+
+let mut rl = RateLimiter::new(10.0, 1.0);
+rl.configure_from_decision("alice", &granted_decision)?;
+
+rl.try_consume("alice")?;  // uses 1 token, refills automatically
+```
+
+A principal with σ₁⁴ = 2 configurations gets 2× the rate of a principal
+with only 1 configuration. The geometry of access maps to throughput.
+
+## Proof-Carrying Cryptography (`crypto` feature)
+
+Ed25519-signed capability tokens for distributed verification:
+
+```rust
+use schubert::crypto::{CapabilityIssuer, CapabilityVerifier};
+
+let issuer = CapabilityIssuer::generate();
+let token = issuer.issue("alice", "read:data")?;
+
+let verifier = CapabilityVerifier::new(issuer.public_key());
+verifier.verify(&token)?;  // signature verified
+```
+
+Tamper detection — modified tokens fail signature verification.
+
+## Verification (`karpal-verify` feature)
+
+Karpal 0.5.0 integration for formal verification of Schubert calculus:
+
+```rust
+use schubert::verify;
+
+let bundle = verify::schubert_bundle();  // 5 proof obligations
+let report = verify::verify_schubert();  // VerificationReport with certificates
+
+let certified = verify::certify_capability(cap, (2, 4))?;  // Certified trust boundary
+```
+
+SMT-LIB2 and Lean 4 export support via `export_schubert_smt()`/
+`export_schubert_lean()`. Property test CI in `.github/workflows/schubert-verify.yml`.
+
 ## Examples
 
 ```bash
@@ -312,6 +380,9 @@ cargo run --example cross_domain
 
 # Context-aware decisions with resource scoping
 cargo run --example context_aware
+
+# Quantitative rate limiting via intersection numbers
+cargo run --example rate_limiter
 ```
 
 ## Dependencies
@@ -320,11 +391,15 @@ cargo run --example context_aware
 - `thiserror` v2 — Error derive macros
 
 Optional (behind feature gates):
-- `serde` + `serde_json` — Serialization and JSON I/O
-- `karpal-proof` v0.3 — Compile-time proof verification
-- `rayon` — Parallel batch operations
-- `toml` — Policy language parsing
-- `wasm-bindgen` + `js-sys` — WebAssembly bindings
+| Feature | Crates |
+|---------|--------|
+| `serde` | `serde`, `serde_json` — serialization and JSON I/O |
+| `karpal` | `karpal-proof` v0.5 — compile-time proof verification |
+| `parallel` | `rayon` — parallel batch operations |
+| `policy` | `toml` — declarative policy language |
+| `wasm` | `wasm-bindgen`, `js-sys` — browser bindings |
+| `crypto` | `ed25519-dalek`, `rand` — cryptographic tokens |
+| `karpal-verify` | `karpal-verify`, `karpal-schubert-types` — formal verification |
 
 No async runtime. No network stack. Embeddable in any Rust project.
 
