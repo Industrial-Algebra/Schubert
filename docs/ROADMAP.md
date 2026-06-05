@@ -1,5 +1,9 @@
 # Schubert — Directions
 
+> **v0.1.0 Snapshot** — All 14 core roadmap items are complete. The speculative
+> directions below are explorations for the research community, not commitments.
+> See [CHANGELOG.md](../CHANGELOG.md) for the full v0.1.0 feature list.
+
 **Version:** 0.1.0 — Foundation complete. IA-conformant. Licensed.
 **Gitflow:** `main` (releases) ← `develop` (integration) ← `feature/*` (work)
 
