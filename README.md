@@ -437,6 +437,6 @@ In summary:
 | SaaS / hosted service (without releasing modifications) | Commercial license required |
 | Evaluation, research, personal projects | AGPL v3 — free |
 
-For commercial licensing inquiries: <license@industrial-algebra.org>
+For commercial licensing inquiries: <license@industrialalgebra.com>
 
 Copyright © 2026 Industrial Algebra. All rights reserved.
