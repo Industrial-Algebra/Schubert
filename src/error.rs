@@ -93,6 +93,33 @@ pub enum SchubertError {
     /// Serialization error from an audit sink.
     #[error("serialization error: {0}")]
     Serialization(String),
+
+    /// Policy parse error.
+    #[error("policy parse error: {0}")]
+    PolicyParseError(String),
+
+    /// Policy export error.
+    #[error("policy export error: {0}")]
+    PolicyExportError(String),
+
+    /// Generic error for multi-controller and other operations.
+    #[error("{0}")]
+    Generic(String),
+
+    /// Cryptographic verification failed.
+    #[error("crypto verification failed: {0}")]
+    CryptoVerificationFailed(String),
+
+    /// Rate limit exceeded for a principal.
+    #[error("rate limit exceeded for principal '{principal}': {available:.2} tokens available out of {capacity:.2}")]
+    RateLimitExceeded {
+        /// The principal that exceeded the rate limit.
+        principal: String,
+        /// Tokens available at time of check.
+        available: f64,
+        /// Maximum token capacity.
+        capacity: f64,
+    },
 }
 
 /// Result type alias for Schubert operations.

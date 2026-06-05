@@ -1,0 +1,41 @@
+name: Schubert Verification
+
+on:
+  push:
+    paths:
+      - 'amari/amari-enumerative/**'
+      - 'karpal/karpal-verify/**'
+      - 'karpal/karpal-schubert-types/**'
+      - 'Schubert/**'
+  pull_request:
+
+jobs:
+  proptest:
+    name: Property Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: Schubert
+      - name: Checkout Amari
+        uses: actions/checkout@v4
+        with:
+          repository: justinelliottcobb/Amari
+          path: amari
+      - name: Checkout Karpal
+        uses: actions/checkout@v4
+        with:
+          repository: Industrial-Algebra/Karpal
+          path: karpal
+      - name: Checkout Minuet
+        uses: actions/checkout@v4
+        with:
+          repository: Industrial-Algebra/Minuet
+          path: Minuet
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Schubert
+      - name: Run karpal-verify tests
+        working-directory: Schubert
+        run: cargo test -p schubert --features karpal-verify

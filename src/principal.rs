@@ -35,17 +35,31 @@ pub struct PrincipalId(pub String);
 
 impl PrincipalId {
     /// Create a new principal ID.
-    pub fn new(id: impl Into<String>) -> Self { Self(id.into()) }
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
     /// Return the inner string.
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl fmt::Display for PrincipalId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.0) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
-impl From<&str> for PrincipalId { fn from(s: &str) -> Self { Self(s.to_string()) } }
-impl From<String> for PrincipalId { fn from(s: String) -> Self { Self(s) } }
+impl From<&str> for PrincipalId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+impl From<String> for PrincipalId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
 
 /// A principal — an identity that holds capabilities.
 ///
@@ -72,6 +86,11 @@ pub struct Principal {
     /// The namespace representing this principal's access space.
     #[cfg_attr(feature = "serde", serde(skip))]
     pub namespace: Namespace,
+    /// Capability IDs that have been granted (in grant order).
+    ///
+    /// Mirrors the namespace capability list for serialization.
+    /// The namespace itself is skipped during serde.
+    pub granted_capability_ids: Vec<String>,
     /// Unix timestamp of creation (milliseconds since epoch).
     pub created_at: u64,
 }
@@ -85,17 +104,20 @@ impl<'de> serde::Deserialize<'de> for Principal {
         #[derive(serde::Deserialize)]
         struct PrincipalData {
             id: PrincipalId,
+            granted_capability_ids: Vec<String>,
             created_at: u64,
         }
         let data = PrincipalData::deserialize(deserializer)?;
         // Namespace is reconstructed externally via grants after deserialization.
-        // Use a placeholder — callers must re-grant capabilities.
+        // Use a placeholder with the default Gr(2,4) — caller must rebuild via
+        // AccessController::rebuild_principal_namespace().
         let namespace = NamespaceBuilder::new(data.id.as_str(), 2, 4)
             .build()
             .map_err(|e| serde::de::Error::custom(e.to_string()))?;
         Ok(Principal {
             id: data.id,
             namespace,
+            granted_capability_ids: data.granted_capability_ids,
             created_at: data.created_at,
         })
     }
@@ -111,7 +133,12 @@ impl Principal {
         let namespace = NamespaceBuilder::new(pid.as_str(), k, n)
             .build()
             .map_err(crate::error::SchubertError::Enumerative)?;
-        Ok(Self { id: pid, namespace, created_at: now_millis() })
+        Ok(Self {
+            id: pid,
+            namespace,
+            granted_capability_ids: Vec::new(),
+            created_at: now_millis(),
+        })
     }
 
     /// Number of capabilities held by this principal.
@@ -148,5 +175,7 @@ pub(crate) fn now_millis() -> u64 {
             .unwrap_or(0)
     }
     #[cfg(any(not(feature = "std"), target_arch = "wasm32"))]
-    { 0 }
+    {
+        0
+    }
 }

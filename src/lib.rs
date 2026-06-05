@@ -85,7 +85,13 @@
 //!   control invariants via [`karpal_proof::Proven`] and [`karpal_proof::Rewrite`].
 //! - `parallel` — Enables batch operations via [`rayon`]: [`AccessController::check_batch`],
 //!   [`AccessController::stability_batch`], [`AccessController::compose_batch`].
-//!   These compute multiple queries in parallel using amari's batch intersection engine.
+//! - `policy` — Enables the [`policy`] module: declarative TOML policy language.
+//!   Use [`AccessController::from_policy_toml`] and [`AccessController::to_policy_toml`].
+//! - `wasm` — Enables the [`wasm`] module with wasm-bindgen JavaScript bindings.
+//!   Compiles to `wasm32-unknown-unknown` with `--no-default-features`.
+//!   See [`wasm::WasmController`] for the browser API.
+//! - `crypto` — Enables the [`crypto`] module with Ed25519 capability tokens,
+//!   [`crypto::CapabilityIssuer`], and [`crypto::CapabilityVerifier`].
 //!
 //! ## `no_std` Support
 //!
@@ -100,30 +106,66 @@
 #![warn(missing_docs)]
 #![warn(clippy::all)]
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 pub mod audit;
 pub mod capability;
 pub mod composition;
 /// Access controller managing principals, capabilities, and checks.
 pub mod controller;
+/// Distributed access control via CRDTs.
+pub mod crdt;
+/// Cryptographic capability tokens (requires `crypto` feature).
+#[cfg(feature = "crypto")]
+pub mod crypto;
 /// Access decision types — the quantitative result of every check.
 pub mod decision;
 pub mod error;
+/// Holographic memory access control via Minuet (requires `holographic` feature).
+#[cfg(feature = "holographic")]
+pub mod holographic;
+/// Multi-Grassmannian access control.
+pub mod multi;
 /// Compile-time phantom type markers from amari-enumerative.
 pub mod phantom;
+/// Declarative policy language (TOML). Requires `policy` feature.
+#[cfg(feature = "policy")]
+pub mod policy;
 pub mod principal;
 /// Proof-carrying access control via Karpal (requires `karpal` feature).
 #[cfg(feature = "karpal")]
 pub mod proof;
+/// Quantitative rate limiting via Schubert intersection numbers.
+pub mod rate_limit;
+/// Geometric network routing via Schubert calculus.
+pub mod routing;
 pub mod stability;
+/// Surreal trust levels (requires `surreal` feature).
+#[cfg(feature = "surreal")]
+pub mod surreal_trust;
+/// Schubert calculus verification via Karpal (future: requires `karpal-verify`).
+#[cfg(feature = "karpal-verify")]
+pub mod verify;
+/// WebAssembly bindings (requires `wasm` feature).
+#[cfg(feature = "wasm")]
+pub mod wasm;
 
 // Core types — everything you typically need
-pub use audit::{AuditSink, DecisionRecord, InMemoryAudit};
+/// Pluggable audit sink for recording access decisions (requires `std`).
+#[cfg(feature = "std")]
+/// Pluggable audit sink for recording access decisions (requires `std`).
+#[cfg(feature = "std")]
+pub use audit::AuditSink;
+pub use audit::{DecisionRecord, InMemoryAudit};
 pub use capability::{Capability, CapabilityId, CapabilityKind};
-pub use composition::{compose, are_composable, CompositionResult};
+pub use composition::{are_composable, compose, CompositionResult};
 pub use controller::AccessController;
-pub use decision::{AccessDecision, ComputationPath};
+pub use decision::{AccessContext, AccessDecision, ComputationPath};
 pub use error::{Result, SchubertError};
+pub use multi::MultiController;
 pub use principal::{Principal, PrincipalId};
+pub use rate_limit::RateLimiter;
 pub use stability::{
     analyze_stability, stable_capabilities_at, StabilityBreakpoint, StabilityReport, TrustLevel,
 };
