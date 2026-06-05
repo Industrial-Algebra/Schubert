@@ -347,7 +347,11 @@ mod tests {
         let json = api_catalog_json();
         let entries: Vec<serde_json::Value> = serde_json::from_str(&json).unwrap();
         // Should have at least 20 API entries
-        assert!(entries.len() >= 20, "Catalog should have >= 20 entries, got {}", entries.len());
+        assert!(
+            entries.len() >= 20,
+            "Catalog should have >= 20 entries, got {}",
+            entries.len()
+        );
         // All entries must be valid
         for entry in &entries {
             assert!(entry["name"].is_string());
