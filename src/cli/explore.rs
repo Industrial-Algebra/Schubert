@@ -179,11 +179,9 @@ pub fn eval_one_shot(json_cmd: &str) -> EvalResult {
                 };
             }
             let dim = k * (n - k);
-            let presets = vec![
-                (2, 4, "Standard RBAC"),
+            let presets = [(2, 4, "Standard RBAC"),
                 (3, 6, "Multi-tenant"),
-                (4, 8, "Enterprise"),
-            ];
+                (4, 8, "Enterprise")];
             let label = presets
                 .iter()
                 .find(|(pk, pn, _)| *pk == k && *pn == n)
