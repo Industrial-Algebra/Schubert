@@ -4,7 +4,6 @@
 > an exhaustive search of prior work. Papers formally establishing these novelty
 > claims are in preparation for arXiv and peer-reviewed venues.
 >
-> **Canonical research copy:** [IA-documents/Schubert/literature-survey.md](https://github.com/Industrial-Algebra/IA-documents/blob/main/Schubert/literature-survey.md)
 
 > literature at the intersection of algebraic geometry and access control.
 >
