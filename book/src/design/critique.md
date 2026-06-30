@@ -9,7 +9,7 @@
 | Concern | Resolution |
 |---|---|
 | No CLI tooling | ✅ CLI with `discover`, `recommend`, `explore` subcommands |
-| AGPL-only licensing | ✅ Dual-licensed AGPL-3.0 + commercial |
+| AGPL-only licensing | ✅ Apache-2.0 with CLA (v0.2.0) |
 | Sparse documentation | ✅ User guide, book, API reference, cookbook |
 | Feature-flag complexity | ✅ Feature flag guide with common combinations |
 
