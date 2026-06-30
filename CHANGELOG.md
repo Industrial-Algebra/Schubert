@@ -1,6 +1,28 @@
 # Changelog
 
-## [0.1.0] — Unreleased
+## [0.2.0] — Unreleased
+
+### Changed
+- **License**: Relicensed from AGPL-3.0-only to **Apache-2.0 with CLA**.
+  Removes the network-use clause that blocked enterprise adoption.
+
+### Added
+- **Benchmarks**: `criterion` benchmarks comparing all 4 computation paths
+  (Littlewood-Richardson, Localization, Tropical, Matroid) on Gr(2,4),
+  Gr(3,6), and Gr(4,8).
+- **Deployment example**: Axum web middleware (`examples/deployment/axum_middleware.rs`)
+  demonstrating Schubert as an HTTP authorization layer.
+- **CRDT staleness gating**: `CrdtState::set_max_staleness()`, `staleness_ms()`,
+  and `is_converged_with()` for guarding access decisions on
+  eventually-consistent state.
+- **Architectural philosophy**: New book section documenting the
+  "exact math, approximate infrastructure" design boundary.
+
+### Removed
+- **LICENSE-COMMERCIAL**: No longer needed under Apache-2.0.
+- **Dual-licensing references**: All docs updated to Apache-2.0 + CLA.
+
+## [0.1.0] — 2026-06-05
 
 ### Added
 - **Core**: `AccessController` with principal management, capability registry, grant/revoke
@@ -28,7 +50,6 @@
 
 ### Infrastructure
 - IA ecosystem conformance (rust-toolchain, phantom types, feature gates)
-- AGPL-3.0 dual-licensing with commercial option
 - 105 unit tests, 12 doc tests, 7 examples, 0 clippy warnings
 - 18 source modules across 9 optional feature gates
 - `docs/ROADMAP.md` with 14 speculative directions

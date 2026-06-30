@@ -2,7 +2,6 @@
 
 > **v0.1.0 Snapshot** — This document reflects the state of the project at its
 > initial public release. Several points raised here have since been addressed:
-> a [CLI](docs/guide/cli.md) now exists, the project is [dual-licensed](LICENSE-COMMERCIAL),
 > and [comprehensive documentation](docs/guide/) has been written. We keep this
 > critique public as an honest record of the project's starting point and a
 > benchmark for future improvement.
@@ -14,8 +13,11 @@ Schubert is a Rust library that replaces binary allow/deny access‑control with
 
 ## Key Criticisms
 
-1. **License – AGPL‑3.0‑only**
-   * The AGPL is a strong copyleft license.  Any downstream product that ships Schubert (or a derivative) must also be released under the AGPL, which is often unacceptable for commercial or proprietary software.  The repository does not offer a commercial‑license exception, so organizations must either open‑source their entire stack or abandon the library.
+1. **License — Apache‑2.0 (as of v0.2.0)**
+   * Prior to v0.2.0, Schubert used AGPL-3.0-only which created enterprise
+     adoption barriers (network clause). This was corrected in the v0.2.0
+     relicense to Apache-2.0 with a Contributor License Agreement (CLA).
+   * The original critique below is preserved as historical record.
 
 2. **Steep Learning Curve**
    * Understanding and writing policies requires familiarity with Schubert calculus, Grassmannians, and intersection theory.  This mathematical background is far beyond the typical skill set of security engineers or DevOps teams, creating a barrier to adoption.
@@ -48,7 +50,7 @@ Schubert is a Rust library that replaces binary allow/deny access‑control with
 ---
 
 ## Recommendations for Improvement
-1. Offer a **dual‑license** model (e.g., AGPL + commercial) to broaden adoption.
+1. ~~Offer a **dual‑license** model (e.g., AGPL + commercial) to broaden adoption.~~ **Addressed in v0.2.0 — relicensed to Apache-2.0.**
 2. Provide **tutorials** and **example policy files** that walk users through the mathematics.
 3. Add a **CLI** for policy validation and generation.
 4. Publish **benchmark results** for typical workloads (single check, batch check, WASM).

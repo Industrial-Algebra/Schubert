@@ -21,6 +21,14 @@ The killer feature: **impossibility detection**. When `σ₂·σ₁₁ = 0` in G
 
 ## Mathematical Foundation
 
+### What's New in v0.2.0
+
+- **Apache-2.0 license** — AGPL network clause removed, full enterprise compatibility
+- **Performance benchmarks** — criterion benches comparing all 4 computation paths on Gr(2,4)/Gr(3,6)/Gr(4,8)
+- **Deployment example** — Axum web middleware (`examples/deployment/`)
+- **CRDT staleness gating** — `set_max_staleness()` and convergence checks for eventually-consistent state
+- **Architectural philosophy** — documented the exact-math/approximate-infrastructure design boundary
+
 ### Grassmannians
 
 A Grassmannian Gr(k,n) is the space of all k-dimensional subspaces of an n-dimensional vector space. Its dimension is k(n−k). Access control operates within this space:
@@ -423,20 +431,15 @@ No async runtime. No network stack. Embeddable in any Rust project.
 
 ## License
 
-Schubert is dual-licensed:
+Schubert is licensed under **Apache-2.0** — a permissive open-source license
+with patent grant and attribution requirements. See [LICENSE](./LICENSE) for
+the full text.
 
-- **GNU Affero General Public License v3 (AGPL-3.0)** — see [LICENSE](./LICENSE)
-- **Commercial License** — for proprietary use, see [LICENSE-COMMERCIAL](./LICENSE-COMMERCIAL)
+All contributors must sign the [Contributor License Agreement (CLA)](https://github.com/Industrial-Algebra/.github/blob/main/CLA.md),
+which grants Industrial Algebra the right to relicense contributions.
 
-In summary:
+For licensing inquiries: <license@industrialalgebra.com>
 
-| Use Case | License |
-|----------|--------|
-| Open-source (AGPL-compatible) projects | AGPL v3 — free |
-| Proprietary / closed-source software | Commercial license required |
-| SaaS / hosted service (without releasing modifications) | Commercial license required |
-| Evaluation, research, personal projects | AGPL v3 — free |
-
-For commercial licensing inquiries: <license@industrialalgebra.com>
+Copyright © 2026 Industrial Algebra. All rights reserved.
 
 Copyright © 2026 Industrial Algebra. All rights reserved.
