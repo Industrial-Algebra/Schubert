@@ -1055,7 +1055,7 @@ dependencies = [
 
 [[package]]
 name = "schubert"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "amari-enumerative 0.23.0",
  "amari-surreal",

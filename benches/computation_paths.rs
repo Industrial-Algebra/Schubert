@@ -13,14 +13,25 @@ fn bench_path(c: &mut Criterion, name: &str, k: usize, n: usize, path: Computati
     let mut acl = AccessController::new(k, n).unwrap();
 
     // Register capabilities
-    acl.register_capability(Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike))
-        .unwrap();
     acl.register_capability(Capability::new(
-        "write", "Write", vec![2], CapabilityKind::WriteLike,
+        "read",
+        "Read",
+        vec![1],
+        CapabilityKind::ReadLike,
     ))
     .unwrap();
     acl.register_capability(Capability::new(
-        "admin", "Admin", vec![2, 1], CapabilityKind::AdminLike,
+        "write",
+        "Write",
+        vec![2],
+        CapabilityKind::WriteLike,
+    ))
+    .unwrap();
+    acl.register_capability(Capability::new(
+        "admin",
+        "Admin",
+        vec![2, 1],
+        CapabilityKind::AdminLike,
     ))
     .unwrap();
 
@@ -31,19 +42,18 @@ fn bench_path(c: &mut Criterion, name: &str, k: usize, n: usize, path: Computati
     let label = format!("Gr({k},{n})/{name}");
     c.bench_function(&label, |b| {
         b.iter(|| {
-            acl.check_with_path(
-                black_box(&alice),
-                black_box(&["read", "write"]),
-                path,
-            )
-            .unwrap()
+            acl.check_with_path(black_box(&alice), black_box(&["read", "write"]), path)
+                .unwrap()
         })
     });
 }
 
 fn bench_grassmannian(c: &mut Criterion, k: usize, n: usize) {
     bench_path(
-        c, "LittlewoodRichardson", k, n,
+        c,
+        "LittlewoodRichardson",
+        k,
+        n,
         ComputationPath::LittlewoodRichardson,
     );
     bench_path(c, "Localization", k, n, ComputationPath::Localization);
