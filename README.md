@@ -21,6 +21,14 @@ The killer feature: **impossibility detection**. When `σ₂·σ₁₁ = 0` in G
 
 ## Mathematical Foundation
 
+### What's New in v0.2.0
+
+- **Apache-2.0 license** — AGPL network clause removed, full enterprise compatibility
+- **Performance benchmarks** — criterion benches comparing all 4 computation paths on Gr(2,4)/Gr(3,6)/Gr(4,8)
+- **Deployment example** — Axum web middleware (`examples/deployment/`)
+- **CRDT staleness gating** — `set_max_staleness()` and convergence checks for eventually-consistent state
+- **Architectural philosophy** — documented the exact-math/approximate-infrastructure design boundary
+
 ### Grassmannians
 
 A Grassmannian Gr(k,n) is the space of all k-dimensional subspaces of an n-dimensional vector space. Its dimension is k(n−k). Access control operates within this space:
