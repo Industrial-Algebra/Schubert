@@ -134,6 +134,10 @@ pub struct CrdtState {
     grants: HashMap<(PrincipalId, CapabilityId), CrdtGrant>,
     /// The current version vector.
     version: VersionVector,
+    /// Maximum allowed staleness in milliseconds. If set, `check()` will
+    /// refuse decisions when the youngest grant is older than this.
+    /// `None` disables staleness gating (default).
+    max_staleness_ms: Option<u64>,
 }
 
 impl CrdtState {
@@ -151,6 +155,7 @@ impl CrdtState {
             capabilities: HashMap::new(),
             grants: HashMap::new(),
             version: VersionVector::new(),
+            max_staleness_ms: None,
         })
     }
 
@@ -303,6 +308,28 @@ impl CrdtState {
     /// Get the current version vector.
     pub fn version(&self) -> &VersionVector {
         &self.version
+    }
+
+    /// Set the maximum allowed staleness. `None` disables staleness gating.
+    pub fn set_max_staleness(&mut self, max_staleness_ms: Option<u64>) {
+        self.max_staleness_ms = max_staleness_ms;
+    }
+
+    /// Get the staleness in milliseconds — the age of the oldest active grant.
+    /// Returns `None` if there are no grants.
+    pub fn staleness_ms(&self) -> Option<u64> {
+        if self.grants.is_empty() {
+            return None;
+        }
+        let max_ts = self.grants.values().map(|g| g.timestamp_ms).max()?;
+        let min_ts = self.grants.values().map(|g| g.timestamp_ms).min()?;
+        Some(max_ts.saturating_sub(min_ts))
+    }
+
+    /// Check whether the CRDT state has converged with another version vector.
+    /// Returns true if this node has seen all operations known to `other_version`.
+    pub fn is_converged_with(&self, other_version: &VersionVector) -> bool {
+        !other_version.happens_before(&self.version)
     }
 }
 
