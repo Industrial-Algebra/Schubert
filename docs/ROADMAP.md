@@ -26,7 +26,7 @@ optional `karpal-proof`, `karpal-verify`, `serde`, `rayon`, `toml`).
 - ✅ Multi-Grassmannian controllers (cross-domain access)
 - ✅ Proof-carrying capabilities (Ed25519 cryptographic tokens)
 - ✅ Constitutional verification (Karpal 0.5.0 integration)
-- ✅ AGPL-3.0 dual-licensing
+- ✅ Apache-2.0 dual-licensing
 
 ---
 
@@ -203,7 +203,7 @@ merge-preserves, last-write-wins, idempotent, crdt-access-check).
 ### 14. Access Control for Holographic Memory — ✅ DONE (v0.1.0)
 
 Integration with Minuet-style holographic memory systems (Minuet 0.3.0,
-AGPL-3.0 licensed). Capabilities are binding vectors in a holographic
+Apache-2.0 licensed). Capabilities are binding vectors in a holographic
 reduced representation. Access is granted when the query vector's
 similarity to the capability vector exceeds the trust threshold.
 The wall-crossing engine determines which memories are accessible at

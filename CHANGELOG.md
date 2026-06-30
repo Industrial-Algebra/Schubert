@@ -28,7 +28,6 @@
 
 ### Infrastructure
 - IA ecosystem conformance (rust-toolchain, phantom types, feature gates)
-- AGPL-3.0 dual-licensing with commercial option
 - 105 unit tests, 12 doc tests, 7 examples, 0 clippy warnings
 - 18 source modules across 9 optional feature gates
 - `docs/ROADMAP.md` with 14 speculative directions

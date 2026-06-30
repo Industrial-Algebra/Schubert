@@ -51,7 +51,6 @@ Schubert depends on three sibling projects:
 
 ## License
 
-Schubert is dual-licensed under **AGPL-3.0-only** and a **commercial license**.
+Schubert is dual-licensed under **Apache-2.0** and a **commercial license**.
 See [LICENSE](https://github.com/Industrial-Algebra/Schubert/blob/main/LICENSE) and
-[LICENSE-COMMERCIAL](https://github.com/Industrial-Algebra/Schubert/blob/main/LICENSE-COMMERCIAL)
 for details.
