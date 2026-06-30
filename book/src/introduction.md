@@ -51,6 +51,8 @@ Schubert depends on three sibling projects:
 
 ## License
 
-Schubert is dual-licensed under **Apache-2.0** and a **commercial license**.
-See [LICENSE](https://github.com/Industrial-Algebra/Schubert/blob/main/LICENSE) and
-for details.
+Schubert is licensed under **Apache-2.0** — a permissive open-source license
+with patent grant and attribution requirements. See [LICENSE](https://github.com/Industrial-Algebra/Schubert/blob/main/LICENSE)
+for the full text. All contributors must sign the [CLA](https://github.com/Industrial-Algebra/.github/blob/main/CLA.md).
+
+For licensing inquiries: <license@industrialalgebra.com>

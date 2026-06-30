@@ -1,6 +1,6 @@
 [package]
 name = "schubert"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.75"
 description = "Schubert calculus as a practical access control system — quantitative capability-based authorization"
@@ -43,6 +43,7 @@ num-traits = "0.2"
 num-bigint = "0.4"
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [[example]]
 name = "rbac"
@@ -72,3 +73,8 @@ path = "examples/context_aware.rs"
 [[example]]
 name = "rate_limiter"
 path = "examples/rate_limiter.rs"
+
+
+[[bench]]
+name = "computation_paths"
+harness = false

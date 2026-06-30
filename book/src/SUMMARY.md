@@ -39,6 +39,7 @@
 - [Surreal Trust Levels](./design/surreal-trust.md)
 - [Holographic Memory (Minuet)](./design/holographic.md)
 - [Security Considerations](./design/security.md)
+- [Architectural Philosophy](./design/architecture-philosophy.md)
 - [Critique & Future Work](./design/critique.md)
 - [Roadmap & History](./design/roadmap.md)
 
