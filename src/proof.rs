@@ -402,7 +402,7 @@ pub mod rewrite {
 
 /// Karpal 0.6.1+ integration: operadic composition verification.
 ///
-/// Wraps [`karpal_schubert_types::SchubertProven::compose_checks()`]
+/// Wraps [`karpal_schubert_types::compose_checks()`]
 /// to provide type-level composability proofs for Schubert access control.
 #[cfg(feature = "karpal-verify")]
 pub mod karpal_compose {
