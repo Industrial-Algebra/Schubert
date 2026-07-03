@@ -4,7 +4,8 @@
 //! Holographic memory access control via Minuet.
 //!
 //! Integrates Minuet's holographic reduced representation with Schubert's
-//! geometric access control. Capabilities are encoded as binding vectors
+//! geometric access control.
+
 //! in a holographic memory. Access is granted when the query vector's
 //! similarity to the stored capability vector exceeds the trust threshold.
 //!
@@ -27,6 +28,7 @@
 //! # Ok::<(), schubert::SchubertError>(())
 //! ```
 
+use minuet::store::ShardedStore;
 use minuet::store::SimpleStore;
 use minuet::ProductCliffordAlgebra;
 use std::collections::HashMap;
@@ -56,11 +58,19 @@ pub struct HoloAccessResult {
 pub struct HolographicAccessControl {
     acl: crate::AccessController,
     /// Holographic memory store for capability vectors.
-    #[allow(dead_code)]
-    store: SimpleStore<HoloAlgebra>,
+    store: HolographicStore,
     /// Map of (principal, capability) → store key ID.
-    #[allow(dead_code)]
     keys: HashMap<(PrincipalId, CapabilityId), u64>,
+}
+
+/// Backing store type for holographic access patterns.
+
+pub enum HolographicStore {
+    /// Simple in-memory store (default).
+    Simple(SimpleStore<HoloAlgebra>),
+    /// Sharded store for parallel access at scale.
+    /// Available with Minuet 0.5.0+.
+    Sharded(ShardedStore<HoloAlgebra>),
 }
 
 impl std::fmt::Debug for HolographicAccessControl {
@@ -72,10 +82,23 @@ impl std::fmt::Debug for HolographicAccessControl {
 }
 
 impl HolographicAccessControl {
-    /// Create a new holographic access control system for Gr(k,n).
+    /// Create a new holographic access control system for Gr(k,n)
+    /// with the default simple store.
     pub fn new(k: usize, n: usize) -> Result<Self> {
         let acl = crate::AccessController::new(k, n)?;
-        let store = SimpleStore::new();
+        let store = HolographicStore::Simple(SimpleStore::new());
+        Ok(Self {
+            acl,
+            store,
+            keys: HashMap::new(),
+        })
+    }
+
+    /// Create with a sharded holographic store for production scale.
+    /// Available with Minuet 0.5.0+.
+    pub fn new_sharded(k: usize, n: usize) -> Result<Self> {
+        let acl = crate::AccessController::new(k, n)?;
+        let store = HolographicStore::Sharded(ShardedStore::new());
         Ok(Self {
             acl,
             store,
