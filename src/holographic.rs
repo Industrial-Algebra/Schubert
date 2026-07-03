@@ -4,8 +4,7 @@
 //! Holographic memory access control via Minuet.
 //!
 //! Integrates Minuet's holographic reduced representation with Schubert's
-//! geometric access control.
-
+//! geometric access control. Capabilities are encoded as binding vectors
 //! in a holographic memory. Access is granted when the query vector's
 //! similarity to the stored capability vector exceeds the trust threshold.
 //!
@@ -58,18 +57,19 @@ pub struct HoloAccessResult {
 pub struct HolographicAccessControl {
     acl: crate::AccessController,
     /// Holographic memory store for capability vectors.
+    #[expect(dead_code)]
     store: HolographicStore,
     /// Map of (principal, capability) → store key ID.
+    #[expect(dead_code)]
     keys: HashMap<(PrincipalId, CapabilityId), u64>,
 }
 
 /// Backing store type for holographic access patterns.
-
+#[expect(clippy::large_enum_variant)]
 pub enum HolographicStore {
     /// Simple in-memory store (default).
     Simple(SimpleStore<HoloAlgebra>),
     /// Sharded store for parallel access at scale.
-    /// Available with Minuet 0.5.0+.
     Sharded(ShardedStore<HoloAlgebra>),
 }
 
@@ -95,7 +95,6 @@ impl HolographicAccessControl {
     }
 
     /// Create with a sharded holographic store for production scale.
-    /// Available with Minuet 0.5.0+.
     pub fn new_sharded(k: usize, n: usize) -> Result<Self> {
         let acl = crate::AccessController::new(k, n)?;
         let store = HolographicStore::Sharded(ShardedStore::new());
