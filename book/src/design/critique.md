@@ -80,9 +80,10 @@ No built-in storage layer. All state is in-memory. Use `serde` serialization +
 your database of choice for persistence. Future work: SQLite/PostgreSQL backends.
 
 ### Real-World Adoption
-Schubert is a new project. The first target application is Knopper's multi-user
-AI coding harness, where distributed contributor correctness is the central
-concern. See [Knopper's Schubert integration roadmap](https://github.com/Industrial-Algebra/Knopper/blob/develop/docs/roadmap/05-distributed-correctness-schubert.md).
+Schubert is a new project. We welcome:
+- Production deployment reports
+- Bug reports and edge cases
+- Integration examples with common stacks (PostgreSQL, Redis, Kubernetes)
 
 ## Future Directions
 
