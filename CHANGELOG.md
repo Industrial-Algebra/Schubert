@@ -1,6 +1,38 @@
 # Changelog
 
-## [0.2.0] — Unreleased
+## [0.3.0] — Unreleased
+
+### Changed
+- **Karpal upgraded 0.5 → 0.6.1** (Apache-2.0, new `compose_checks()` API)
+- **Minuet upgraded 0.3 → 0.5.0** (Apache-2.0, ShardedStore support)
+
+### Added
+- **Distributed game sync design** (`docs/design/distributed-game-sync.md`) —
+  formal mapping from game state to Grassmannian, operational definition of
+  "configuration," concrete impossibility detection case (σ₂·σ₁₁ = 0).
+  Addresses the foundational critique blockers.
+- **Threat model** (`book/design/threat-model.md`) — adversary capabilities,
+  security properties, audit trail discussion, non-identifiability clarification.
+- **Flag structure** (`book/design/flag-structure.md`) — reference flag as
+  clearance hierarchy, explains why σ₂ and σ₁₁ differ despite same codimension.
+- **Adversarial concerns** (`book/design/adversarial-concerns.md`) — DoS
+  mitigation, dimensionality poisoning, CRDT state poisoning, timing channels.
+- **`karpal_compose` module** (`src/proof.rs`) — type-level triple-composition
+  verification via `SchubertProven::compose_checks()`.
+- **`HolographicStore` enum** (`src/holographic.rs`) — Simple + Sharded store
+  variants with `new_sharded()` constructor for production-scale holographic storage.
+- **Notation guide** in concepts/math.md (σ symbols, point class defined).
+- **Prior art references** in concepts/math.md.
+- **Rust quickstart code** in book introduction.
+- **Dependency table** clarifying optional vs required crates.
+
+### Documentation Improvements
+- Relabeled "verified mathematical properties" → "algebraic identities" with
+  caveat that security relevance depends on the domain mapping.
+- Moved "What's New" section from math foundation to end of README.
+- 14 of 22 Proserpina critique findings addressed.
+
+## [0.2.0] — 2026-06-30
 
 ### Changed
 - **License**: Relicensed from AGPL-3.0-only to **Apache-2.0 with CLA**.
