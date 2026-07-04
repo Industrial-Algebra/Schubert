@@ -32,6 +32,33 @@ impossible** — no subspace of ℝ⁴ can simultaneously satisfy both condition
 A traditional RBAC system with boolean AND would approve. Schubert returns
 `AccessDecision::Impossible` and tells you exactly which capabilities conflict.
 
+## Quick Start
+
+```rust
+use schubert::{AccessController, Capability, CapabilityKind, AccessDecision};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut acl = AccessController::new(2, 4)?;
+    acl.register_capability(Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike))?;
+    acl.register_capability(Capability::new("write", "Write", vec![2], CapabilityKind::WriteLike))?;
+
+    let alice = acl.create_principal("alice")?;
+    acl.grant(&alice, "read")?;
+    acl.grant(&alice, "write")?;
+
+    match acl.check(&alice, &["read", "write"])? {
+        AccessDecision::Granted { configurations, .. } => {
+            println!("Granted: {configurations} valid configurations");
+        }
+        AccessDecision::Impossible { conflicting } => {
+            println!("Impossible: {conflicting:?}");
+        }
+        _ => println!("Denied or underconstrained"),
+    }
+    Ok(())
+}
+```
+
 ## What Schubert Is Not
 
 - **Not an authentication system** — identity belongs to your OAuth/OIDC provider
@@ -45,9 +72,14 @@ Schubert depends on three sibling projects:
 
 | Crate | Version | Role |
 |---|---|---|
-| [Amari](https://github.com/Industrial-Algebra/Amari) | 0.23 | Schubert calculus engine — Grassmannians, intersection numbers |
-| [Karpal](https://github.com/Industrial-Algebra/Karpal) | 0.5 | Formal verification — type-level proofs, SMT/Lean obligations |
-| [Minuet](https://github.com/Industrial-Algebra/Minuet) | 0.3 | Holographic memory — cosine-similarity access patterns |
+| Crate | Version | Role | Required? |
+|---|---|---|---|
+| [Amari](https://github.com/Industrial-Algebra/Amari) | 0.23 | Schubert calculus engine — Grassmannians, intersection numbers | **Yes** (core) |
+| [Karpal](https://github.com/Industrial-Algebra/Karpal) | 0.6 | Formal verification — type-level proofs, SMT/Lean obligations | Optional (`karpal` / `karpal-verify` feature) |
+| [Minuet](https://github.com/Industrial-Algebra/Minuet) | 0.5 | Holographic memory — cosine-similarity access patterns | Optional (`holographic` feature) |
+
+Only Amari is a hard dependency. Karpal and Minuet are opt-in features for
+formal verification and holographic access patterns respectively.
 
 ## License
 
