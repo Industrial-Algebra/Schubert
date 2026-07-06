@@ -1,10 +1,11 @@
 # Schubert — Directions
 
-> **v0.1.0 Snapshot** — All 14 core roadmap items are complete. The speculative
-> directions below are explorations for the research community, not commitments.
-> See [CHANGELOG.md](../CHANGELOG.md) for the full v0.1.0 feature list.
+> **v0.3.0 Snapshot** — All 14 core roadmap items complete. Karpal/Minuet
+> upgraded to Apache-2.0. Formal mapping substantiated via distributed game
+> sync design. 14 Proserpina critique findings addressed.
+> See [CHANGELOG.md](../CHANGELOG.md) for version history.
 
-**Version:** 0.1.0 — Foundation complete. IA-conformant. Licensed.
+**Version:** 0.3.0 — Clean AGPL break. Formal foundation. Apache-2.0 throughout.
 **Gitflow:** `main` (releases) ← `develop` (integration) ← `feature/*` (work)
 
 ---
@@ -208,6 +209,43 @@ reduced representation. Access is granted when the query vector's
 similarity to the capability vector exceeds the trust threshold.
 The wall-crossing engine determines which memories are accessible at
 each trust level.
+
+---
+
+## Near-Term (v0.4.0)
+
+### 15. schubert-tsukoshi — Pure TypeScript Access Control
+
+**Goal:** Extract Schubert's core access control model into a zero-dependency
+TypeScript package, following the cliffy-tsukoshi pattern.
+
+**Architecture:**
+- **LR coefficient tables** — precomputed lookup tables for Gr(2,4), Gr(3,6),
+  Gr(4,8). No amari-enumerative, no Rust, no WASM. Pure TS table lookups are
+  faster than WASM for these small Grassmannians.
+- **AccessController** — capability registry, principals, grant/revoke, check()
+- **Impossibility detection** — the killer feature, via LR table returning 0
+- **CRDT grants** — wraps cliffy-tsukoshi's VectorClock + GeometricCRDT for
+  distributed access state
+- **Universal deployment** — browser, Node.js, React Native, Deno
+
+**What it provides:**
+- Browser-native geometric access control (no backend required)
+- Impossibility detection in JavaScript — the σ₂·σ₁₁ = 0 case works in the browser
+- CRDT-backed distributed access (leveraging cliffy-tsukoshi's protocols)
+- "Smuggle the mathematics" — JS developers call check(), never need to know
+  what a Grassmannian is
+
+**What it doesn't need:**
+- No karpal verification (requires Rust type system)
+- No surreal trust (use `number` for trust in JS)
+- No minuet holographic (no holographic memory in browser)
+
+**Scope:** ~1 week of focused work. Published as `@ia/schubert-tsukoshi` on npm.
+
+**Reference:** [cliffy-tsukoshi](https://github.com/justinelliottcobb/Cliffy/tree/main/cliffy-tsukoshi) —
+the pattern this follows (pure TS extraction of geometric math from a Rust
+framework, with distributed protocols).
 
 ---
 
