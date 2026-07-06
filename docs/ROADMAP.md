@@ -247,6 +247,43 @@ TypeScript package, following the cliffy-tsukoshi pattern.
 the pattern this follows (pure TS extraction of geometric math from a Rust
 framework, with distributed protocols).
 
+### 16. Consumer-Driven API Polish (from Ijima Integration)
+
+**Motivation:** Ijima — Schubert's first real consumer — revealed integration
+friction points. Each item below eliminates custom boilerplate Ijima had to
+write.
+
+**1. `CapabilityToken::to_bytes()` / `from_bytes()`**
+Ijima reimplemented 80 lines of custom binary wire format (length-prefixed
+fields + base64). Add native serialization to eliminate per-consumer wire
+format code.
+
+**2. `CapabilityIssuer::from_seed()` + `public_key_hex()`**
+Ijima wraps `ed25519_dalek::SigningKey::from_bytes()` and manually hex-encodes
+the public key. Add convenience methods directly on the issuer.
+
+**3. `schubert::axum` module** (feature-gated)
+Ijima wrote its own `AuthPrincipal` Axum extractor (100 lines). Provide built-in
+extractors and middleware so consumers don't reinvent the integration layer.
+
+**4. Multi-capability tokens**
+Tokens currently carry one capability. Ijima's `require()` checks
+`token.capability == required || token.capability == ADMIN`. Support tokens
+that carry `Vec<CapabilityId>` to reduce token management overhead.
+
+**5. Key persistence utilities**
+Ijima wrote 180 lines of file-based key storage (`key_store.rs`) with `0600`
+permissions, path resolution, and load-or-create semantics. Provide a `KeyStore`
+utility or document the recommended pattern.
+
+**6. `check_single()` fast path**
+Ijima bypasses the geometric intersection for per-request checks (uses string
+comparison) because the full `check()` is too heavy for runtime. Provide a
+lightweight single-capability check suitable for high-throughput request paths.
+
+**Scope:** ~2–3 days of focused work. All items are directly validated by
+real consumer usage.
+
 ---
 
 ## Design Principles (Preserved Across All Directions)
