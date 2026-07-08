@@ -286,6 +286,66 @@ real consumer usage.
 
 ---
 
+## Research Directions (v0.5.0+ and Beyond)
+
+### 17. Compositional Wall-Crossing
+
+**Origin:** The stability-engine rabbit hole (2026-07-06) identified this as
+Schubert's deepest open theoretical question.
+
+**The question:** Does the wall-crossing phase diagram compose under operadic
+gluing? If Principal C = A ∘_S B (composed along shared capability set S), is
+the phase diagram P_C determined by P_A and P_B?
+
+**Why it matters:** In physics, BPS bound states have different wall-crossing
+behavior than their constituents. The Kontsevich-Soibelman (KS) formula
+governs how the spectrum changes when crossing a wall. If Schubert's
+composition satisfies a KS-type formula, then wall-crossing composes — and
+Schubert is not just a geometric access control system but a **category**: 
+principals as objects, compositions as morphisms, wall-crossing as a natural
+transformation from trust levels to stable capability sets.
+
+**Implementation:**
+- Add `analyze_composed_stability()` that takes two principals + shared
+  capabilities and returns the composed phase diagram
+- Compare against individual phase diagrams to test for a KS-type relation
+- If confirmed, this becomes the arXiv preprint's central theoretical result
+
+**Scope:** Research-grade. Requires formal mathematical work alongside
+implementation. Directly informs the publication strategy (Ch. 8 of the
+revised preprint outline).
+
+### 18. Cross-Domain Flag Variety Embedding
+
+**Origin:** Deferred Proserpina critique finding — cross-domain intersection
+derivation needs a flag variety embedding proof.
+
+**The question:** Can capability translation between Grassmannians
+Gr(k₁,n₁) → Gr(k₂,n₂) be formalized as an embedding into a common flag
+variety Fl(k₁, k₂, n)?
+
+**Why it matters:** The `MultiController` currently translates capabilities
+between Grassmannians heuristically. A flag variety embedding would provide
+the formal mathematical foundation — and would close the gap between the
+multi-domain implementation and its theoretical justification.
+
+**Scope:** Paper material. Requires algebraic geometry expertise. Maps to
+Ch. 12 (Future Work) of the arXiv preprint.
+
+### 19. GPU-Accelerated Schubert Calculus
+
+**Origin:** Borsalino (the IA GPU abstraction layer) provides WGSL kernel
+dispatch for geometric algebra operations.
+
+**The opportunity:** Large Grassmannians (Gr(k,n) with n > 8) require
+computation paths beyond Littlewood-Richardson. Borsalino's GPU substrate
+could accelerate equivariant localization and tropical intersection
+computations, making large-Grassmannian access control practical.
+
+**Scope:** Depends on Borsalino reaching ecosystem adoption. Long-term.
+
+---
+
 ## Design Principles (Preserved Across All Directions)
 
 1. **No network service.** Schubert remains a library. Deployment patterns (daemon, sidecar, plugin) are the caller's choice.
