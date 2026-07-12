@@ -266,10 +266,21 @@ the public key. Add convenience methods directly on the issuer.
 Ijima wrote its own `AuthPrincipal` Axum extractor (100 lines). Provide built-in
 extractors and middleware so consumers don't reinvent the integration layer.
 
-**4. Multi-capability tokens**
-Tokens currently carry one capability. Ijima's `require()` checks
-`token.capability == required || token.capability == ADMIN`. Support tokens
-that carry `Vec<CapabilityId>` to reduce token management overhead.
+**4. Multi-capability tokens (grants)**
+Tokens currently carry one capability. Ijima's pi integration needs 4–6
+capabilities simultaneously and currently juggles an env-bundle of one-cap
+tokens. Dominic's federation orchestration has the same pain at scale.
+Full requirements in
+[`handoff-multi-capability-tokens.md`](handoff-multi-capability-tokens.md)
+(PR #29). Design: a `Grant` carries `Vec<CapabilityId>`, signed once,
+verifiable per-capability. Geometrically, a grant is a **subvariety** of
+Gr(k,n) — the union of the granted Schubert varieties — and `may(cap)` asks
+whether the cap's Schubert variety is contained in that subvariety.
+Singleton grants `[cap]` are backward-compatible with today's one-cap tokens.
+**Relationship to #18:** within a single Grassmannian, grant containment is
+set membership (v0.4.0). The flag variety embedding (#18) generalizes this
+to cross-domain grants and upgrades set membership to geometric containment.
+See the analysis below.
 
 **5. Key persistence utilities**
 Ijima wrote 180 lines of file-based key storage (`key_store.rs`) with `0600`
@@ -331,6 +342,14 @@ multi-domain implementation and its theoretical justification.
 
 **Scope:** Paper material. Requires algebraic geometry expertise. Maps to
 Ch. 12 (Future Work) of the arXiv preprint.
+
+**Relationship to #16.4 (multi-cap tokens):** A multi-cap grant on a single
+Grassmannian is a union of Schubert varieties — containment is set membership
+or codimension comparison. But a cross-domain grant (capabilities on both
+Gr(k₁,n) and Gr(k₂,n)) lives naturally on the flag variety Fl(k₁, k₂, n):
+"this principal holds a flag V_{k₁} ⊂ V_{k₂} ⊂ Cⁿ satisfying both domain
+conditions." The flag variety embedding upgrades the v0.4.0 set-membership
+semantics to true geometric containment across domains.
 
 ### 19. GPU-Accelerated Schubert Calculus
 
