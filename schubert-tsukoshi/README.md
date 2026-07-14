@@ -133,9 +133,44 @@ Schubert classes are multiplied via precomputed Littlewood-Richardson coefficien
 
 This mirrors the Littlewood-Richardson branch of Schubert's `AccessController::check`.
 
-## Distributed access (Phase 2b)
+## Distributed grants (`./protocols`)
 
-The `./protocols` entry point is reserved for `GrantCRDT` — a capability-grant set reconciled across replicas using `@cliffy-ga/tsukoshi`'s `VectorClock` primitive. The token-crypto layer (`./crypto`, above) is its prerequisite and ships now; the GrantCRDT itself is the remaining Phase 2b work for a focused sprint.
+A replicated capability-grant set — `GrantCRDT` — for synchronizing *who has
+what capability* across leaderless replicas, built on `@cliffy-ga/tsukoshi`'s
+`VectorClock`. This is the **trusted-replica** counterpart to the
+proof-carrying tokens in `./crypto`:
+
+- `./crypto` (`GrantToken`) — untrusted clients present a signed bearer token.
+- `./protocols` (`GrantCRDT`) — trusted replicas converge on a shared grant set
+  and answer access queries from merged state.
+
+```ts
+import { GrantCRDT } from "@industrialalgebra/schubert-tsukoshi/protocols";
+
+const hub = new GrantCRDT("hub");
+hub.grant("alice", { id: "memory:read",  partition: [1] });
+hub.grant("alice", { id: "memory:write", partition: [2] });
+
+const edge = new GrantCRDT("edge");
+edge.merge(hub);                  // edge converges to hub's grant set
+edge.may("alice", [1]);           // true — geometric containment over merged state
+edge.revoke("alice", "memory:write");
+
+// Snapshot/restore for transport:
+const snap = edge.toJSON();
+const restored = GrantCRDT.fromJSON(snap, "edge-2");
+```
+
+**Semantics:** state-based last-writer-wins map keyed by `(principal,
+capability)`. The later vector clock wins; on concurrent ops **grant wins over
+revoke** (add-wins), with nodeId as a deterministic tiebreak. Merge is
+commutative, associative, and idempotent, so replicas reach strong eventual
+consistency regardless of delivery order.
+
+> The `./protocols` subpath depends on `@cliffy-ga/tsukoshi` (for `VectorClock`)
+> but **not** on `@noble/ed25519` — its `may()` uses the shared, dependency-free
+> `partitionsLe`. (`@cliffy-ga/tsukoshi` will migrate to the
+> `@industrialalgebra` scope during its refactor.)
 
 ## License
 

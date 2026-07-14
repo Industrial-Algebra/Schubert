@@ -4,16 +4,21 @@
 /**
  * Distributed protocols for schubert-tsukoshi.
  *
- * **Status: Phase 2b (remaining).** The token-crypto prerequisite
- * (`./crypto`) ships in v0.4.0. This entry point is reserved for the
- * `GrantCRDT` — a capability-grant set reconciled across replicas using
- * cliffy-tsukoshi's `VectorClock` primitive (the op-based last-writer-wins
- * merge pattern), layered on top of the crypto layer to sign/verify
- * replicated grants. It is intentionally empty so the package's dual-entry
- * shape matches `@cliffy-ga/tsukoshi` today; the implementation lands in a
- * focused sprint.
+ * Currently provides {@link GrantCRDT} — a capability-grant set replicated
+ * across leaderless replicas using `@cliffy-ga/tsukoshi`'s `VectorClock`
+ * (state-based LWW-map with add-wins on concurrent ops). This is the
+ * trusted-replica counterpart to the `./crypto` proof-carrying tokens.
+ *
+ * @example
+ * ```ts
+ * import { GrantCRDT } from "@industrialalgebra/schubert-tsukoshi/protocols";
+ *
+ * const replica = new GrantCRDT("node-1");
+ * replica.grant("alice", { id: "memory:read", partition: [1] });
+ * ```
  *
  * @packageDocumentation
  */
 
-export {};
+export { GrantCRDT } from "./grant-crdt.js";
+export type { SerializedGrantCRDT } from "./grant-crdt.js";

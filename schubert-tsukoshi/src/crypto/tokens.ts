@@ -13,6 +13,8 @@ import {
   writeU16,
   writeU8,
 } from "./wire.js";
+import { partitionsLe } from "../partition.js";
+export { partitionsLe };
 
 // --- Ed25519 setup (noble needs a SHA-512 implementation plugged in) ---
 // This is standard RFC 8032 Ed25519 — byte-compatible with ed25519-dalek.
@@ -306,20 +308,6 @@ export class Verifier {
       throw new Error("schubert-tsukoshi: token issuer key does not match verifier");
     }
   }
-}
-
-/** Component-wise partition comparison: `a ≤ b` (padding shorter with zeros). */
-export function partitionsLe(
-  a: readonly number[],
-  b: readonly number[],
-): boolean {
-  const maxLen = Math.max(a.length, b.length);
-  for (let i = 0; i < maxLen; i++) {
-    const av = a[i] ?? 0;
-    const bv = b[i] ?? 0;
-    if (av > bv) return false;
-  }
-  return true;
 }
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
