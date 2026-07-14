@@ -66,6 +66,45 @@ Notably, σ₂·σ₁₁ is **not** impossible on the larger Gr(3,6) — the big
 | `"underconstrained"` | Conditions don't pin a finite config set (`dimension` > 0).         |
 | `"denied"`        | Principal lacks a required capability (`missing` id) — set-membership.  |
 
+## Capability tokens (`./crypto`)
+
+Ed25519-signed capability and grant tokens — a TypeScript mirror of the Rust
+`crypto` module, with a wire format **byte-compatible** with the Rust crate.
+Tokens issued in Rust verify here and vice-versa.
+
+> The `./crypto` subpath depends on `@noble/ed25519` and `@noble/hashes`
+> (audited, standard). The core `.` entry remains zero-dependency.
+
+```ts
+import {
+  Issuer,
+  Verifier,
+  grantToBytes,
+  grantFromBytes,
+} from "@industrial-algebra/schubert-tsukoshi/crypto";
+
+// Persist the issuer by its 32-byte seed (store securely, e.g. 0600 file).
+const issuer = Issuer.fromSeedHex(process.env.ISSUER_SEED!);
+const grant = issuer.issueGrant("alice", [
+  { id: "memory:read",  partition: [1] },
+  { id: "memory:write", partition: [2] },
+]);
+
+// Verifiers only need the public key.
+const verifier = new Verifier(issuer.publicKey());
+verifier.verifyGrant(grant);           // throws if signature invalid
+verifier.may(grant, [1]);              // true — geometric containment
+
+// Wire format roundtrips and is Rust-compatible:
+const bytes = grantToBytes(grant);
+grantFromBytes(bytes);
+```
+
+**Interop guarantee:** the cross-validation test suite
+(`src/crypto/tokens.test.ts`) issues tokens from a fixed seed in both Rust and
+TypeScript and asserts byte-identical output. Regenerate the Rust vectors with
+`cargo run --example tsukoshi_crypto_vectors --features crypto`.
+
 ## Supported Grassmannians
 
 Precomputed tables ship for three policy spaces:
@@ -94,9 +133,9 @@ Schubert classes are multiplied via precomputed Littlewood-Richardson coefficien
 
 This mirrors the Littlewood-Richardson branch of Schubert's `AccessController::check`.
 
-## Distributed access (Phase 2)
+## Distributed access (Phase 2b)
 
-The `./protocols` entry point is reserved for `GrantCRDT` — a capability-grant set reconciled across replicas using `@cliffy-ga/tsukoshi`'s `VectorClock` primitive. It lands in a focused sprint after the v0.4.0 core.
+The `./protocols` entry point is reserved for `GrantCRDT` — a capability-grant set reconciled across replicas using `@cliffy-ga/tsukoshi`'s `VectorClock` primitive. The token-crypto layer (`./crypto`, above) is its prerequisite and ships now; the GrantCRDT itself is the remaining Phase 2b work for a focused sprint.
 
 ## License
 

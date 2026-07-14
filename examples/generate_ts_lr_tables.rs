@@ -94,11 +94,11 @@ fn main() {
     .unwrap();
     writeln!(header, "// DO NOT EDIT. Regenerate from the Schubert Rust crate.").unwrap();
     writeln!(header, "// SPDX-License-Identifier: Apache-2.0").unwrap();
-    writeln!(header, "").unwrap();
+    writeln!(header).unwrap();
     writeln!(header, "// Littlewood-Richardson coefficient tables for Schubert access").unwrap();
     writeln!(header, "// control, computed exactly by amari-enumerative. See the generator").unwrap();
     writeln!(header, "// (`examples/generate_ts_lr_tables.rs`) for the math.").unwrap();
-    writeln!(header, "").unwrap();
+    writeln!(header).unwrap();
     writeln!(header, "export interface GrassmannianTable {{").unwrap();
     writeln!(header, "  /** k parameter of Gr(k,n). */").unwrap();
     writeln!(header, "  readonly k: number;").unwrap();
@@ -113,13 +113,13 @@ fn main() {
     writeln!(header, "  /** Pairwise product: key `\"λ|μ\"` -> list of `[νKey, coeff]`. */").unwrap();
     writeln!(header, "  readonly product: Readonly<Record<string, ReadonlyArray<readonly [string, number]>>>;").unwrap();
     writeln!(header, "}}").unwrap();
-    writeln!(header, "").unwrap();
+    writeln!(header).unwrap();
     writeln!(header, "export interface GrassmannianTables {{").unwrap();
     writeln!(header, "  readonly gr24: GrassmannianTable;").unwrap();
     writeln!(header, "  readonly gr36: GrassmannianTable;").unwrap();
     writeln!(header, "  readonly gr48: GrassmannianTable;").unwrap();
     writeln!(header, "}}").unwrap();
-    writeln!(header, "").unwrap();
+    writeln!(header).unwrap();
     writeln!(header, "export const TABLES: GrassmannianTables = {{").unwrap();
 
     for (idx, g) in targets.iter().enumerate() {
