@@ -241,7 +241,7 @@ TypeScript package, following the cliffy-tsukoshi pattern.
 - No surreal trust (use `number` for trust in JS)
 - No minuet holographic (no holographic memory in browser)
 
-**Scope:** ~1 week of focused work. Published as `@ia/schubert-tsukoshi` on npm.
+**Scope:** ~1 week of focused work. Published as `@industrialalgebra/schubert-tsukoshi` on npm (the canonical IA scope; cliffy-tsukoshi and amari-wasm will migrate there during their refactors).
 
 **Reference:** [cliffy-tsukoshi](https://github.com/justinelliottcobb/Cliffy/tree/main/cliffy-tsukoshi) —
 the pattern this follows (pure TS extraction of geometric math from a Rust

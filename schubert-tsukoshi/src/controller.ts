@@ -100,7 +100,7 @@ function classPoly(p: Partition): SchubertPoly {
  *
  * @example
  * ```ts
- * import { AccessController } from "@industrial-algebra/schubert-tsukoshi";
+ * import { AccessController } from "@industrialalgebra/schubert-tsukoshi";
  *
  * const acl = new AccessController("gr24"); // Gr(2,4)
  * acl.registerCapability({ id: "read", partition: [1], kind: "read" });

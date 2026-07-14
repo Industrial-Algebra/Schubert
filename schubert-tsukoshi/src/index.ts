@@ -11,7 +11,7 @@
  *
  * @example
  * ```ts
- * import { AccessController } from "@industrial-algebra/schubert-tsukoshi";
+ * import { AccessController } from "@industrialalgebra/schubert-tsukoshi";
  *
  * const acl = new AccessController("gr24");
  * ```

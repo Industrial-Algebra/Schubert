@@ -1,5 +1,5 @@
 {
-  "name": "@industrial-algebra/schubert-tsukoshi",
+  "name": "@industrialalgebra/schubert-tsukoshi",
   "version": "0.4.0",
   "description": "Pure TypeScript geometric access control via Schubert calculus — zero-dependency extraction of the Schubert Rust crate, with impossibility detection in the browser.",
   "type": "module",

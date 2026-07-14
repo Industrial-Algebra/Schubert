@@ -11,15 +11,15 @@ It follows the `@cliffy-ga/tsukoshi` pattern: pure TypeScript, zero dependencies
 ## Install
 
 ```bash
-npm install @industrial-algebra/schubert-tsukoshi
+npm install @industrialalgebra/schubert-tsukoshi
 ```
 
-> **Publish note:** the `@industrial-algebra` npm org must be created before first publish. The package is build-ready now.
+> **Publish:** the `@industrialalgebra` npm org exists; this package is publish-ready (run `npm publish` from `schubert-tsukoshi/`).
 
 ## Quick start
 
 ```ts
-import { AccessController } from "@industrial-algebra/schubert-tsukoshi";
+import { AccessController } from "@industrialalgebra/schubert-tsukoshi";
 
 const acl = new AccessController("gr24"); // Gr(2,4): a 4-dimensional policy space
 
@@ -81,7 +81,7 @@ import {
   Verifier,
   grantToBytes,
   grantFromBytes,
-} from "@industrial-algebra/schubert-tsukoshi/crypto";
+} from "@industrialalgebra/schubert-tsukoshi/crypto";
 
 // Persist the issuer by its 32-byte seed (store securely, e.g. 0600 file).
 const issuer = Issuer.fromSeedHex(process.env.ISSUER_SEED!);

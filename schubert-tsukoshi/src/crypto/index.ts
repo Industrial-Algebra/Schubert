@@ -10,12 +10,12 @@
  * verify here and vice-versa (see the cross-validation test suite).
  *
  * Requires `@noble/ed25519` and `@noble/hashes` (regular dependencies of this
- * subpath). The core `@industrial-algebra/schubert-tsukoshi` entry remains
+ * subpath). The core `@industrialalgebra/schubert-tsukoshi` entry remains
  * zero-dependency.
  *
  * @example
  * ```ts
- * import { Issuer, Verifier } from "@industrial-algebra/schubert-tsukoshi/crypto";
+ * import { Issuer, Verifier } from "@industrialalgebra/schubert-tsukoshi/crypto";
  *
  * const issuer = Issuer.fromSeedHex("2a".repeat(32));
  * const grant = issuer.issueGrant("alice", [
