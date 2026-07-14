@@ -91,7 +91,9 @@
 //!   Compiles to `wasm32-unknown-unknown` with `--no-default-features`.
 //!   See [`wasm::WasmController`] for the browser API.
 //! - `crypto` — Enables the [`crypto`] module with Ed25519 capability tokens,
-//!   [`crypto::CapabilityIssuer`], and [`crypto::CapabilityVerifier`].
+//!   [`crypto::CapabilityIssuer`], [`crypto::GrantToken`], and [`crypto::GrantVerifier`].
+//! - `axum` — Enables the [`axum`] module with an [`axum::AuthPrincipal`] extractor
+//!   for Bearer-token authentication in Axum web services. Requires `crypto`.
 //!
 //! ## `no_std` Support
 //!
@@ -119,6 +121,10 @@ pub mod crdt;
 /// Cryptographic capability tokens (requires `crypto` feature).
 #[cfg(feature = "crypto")]
 pub mod crypto;
+
+/// Axum integration — extractors and middleware (requires `axum` feature).
+#[cfg(feature = "axum")]
+pub mod axum;
 /// Access decision types — the quantitative result of every check.
 pub mod decision;
 pub mod error;

@@ -214,12 +214,64 @@ impl AccessController {
     /// Uses the Littlewood-Richardson path by default. For explicit path
     /// selection, use [`check_with_path`](Self::check_with_path). For
     /// automatic routing, use [`check_auto`](Self::check_auto).
+    ///
+    /// For the common single-capability case, prefer [`check_single`](Self::check_single)
+    /// which avoids geometric intersection computation entirely.
     pub fn check(&self, principal_id: &PrincipalId, required: &[&str]) -> Result<AccessDecision> {
         self.check_with_path(
             principal_id,
             required,
             ComputationPath::LittlewoodRichardson,
         )
+    }
+
+    /// Fast-path check for a single capability.
+    ///
+    /// Checks whether the principal holds exactly one required capability.
+    /// This is a lightweight set-membership check — no geometric intersection
+    /// computation, no LR coefficients, no Grassmannian machinery.
+    /// Suitable for high-throughput per-request authorization where the
+    /// full geometric check is unnecessary.
+    ///
+    /// Returns `AccessDecision::Granted { configurations: 1, path: ... }`
+    /// if the principal holds the capability, or `AccessDecision::Denied`
+    /// otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use schubert::{AccessController, AccessDecision, Capability, CapabilityKind};
+    ///
+    /// let mut acl = AccessController::new(2, 4)?;
+    /// acl.register_capability(Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike))?;
+    /// let alice = acl.create_principal("alice")?;
+    /// acl.grant(&alice, "read")?;
+    ///
+    /// let decision = acl.check_single(&alice, "read")?;
+    /// assert!(matches!(decision, AccessDecision::Granted { .. }));
+    ///
+    /// let decision = acl.check_single(&alice, "write")?;
+    /// assert!(matches!(decision, AccessDecision::Denied));
+    /// # Ok::<(), schubert::SchubertError>(())
+    /// ```
+    pub fn check_single(
+        &self,
+        principal_id: &PrincipalId,
+        required: &str,
+    ) -> Result<AccessDecision> {
+        let principal = self
+            .principals
+            .get(principal_id)
+            .ok_or_else(|| SchubertError::PrincipalNotFound(principal_id.to_string()))?;
+
+        if principal.holds(required) {
+            Ok(AccessDecision::Granted {
+                configurations: 1,
+                path: ComputationPath::LittlewoodRichardson,
+            })
+        } else {
+            Ok(AccessDecision::Denied)
+        }
     }
 
     /// Check access with an explicit computation path preference.
@@ -1387,6 +1439,52 @@ mod tests {
             "Matroid: must be impossible"
         );
     }
+
+    // --- check_single fast path ---
+
+    #[test]
+    fn check_single_granted() {
+        let mut acl = make_controller();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "sigma1_0").unwrap();
+
+        let decision = acl.check_single(&p, "sigma1_0").unwrap();
+        assert!(matches!(decision, AccessDecision::Granted { .. }));
+    }
+
+    #[test]
+    fn check_single_denied() {
+        let mut acl = make_controller();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "sigma1_0").unwrap();
+
+        let decision = acl.check_single(&p, "sigma2_0").unwrap();
+        assert!(matches!(decision, AccessDecision::Denied));
+    }
+
+    #[test]
+    fn check_single_principal_not_found() {
+        let acl = make_controller();
+        let p = PrincipalId::new("nobody");
+        assert!(acl.check_single(&p, "sigma1_0").is_err());
+    }
+
+    #[test]
+    fn check_single_owes_detector() {
+        // Regression: check_single must detect the OWES class bug (σ₂·σ₁₁)
+        // by returning Denied when the capability is not held, even though
+        // a non-existent capability could have been geometrically possible.
+        let mut acl = make_controller();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "sigma2_0").unwrap();
+        acl.grant(&p, "sigma11").unwrap();
+
+        // sigma2_0 and sigma11 together are impossible geometrically,
+        // but check_single bypasses geometry — it only checks set membership.
+        // Each individually is still held.
+        assert!(matches!(acl.check_single(&p, "sigma2_0").unwrap(), AccessDecision::Granted { .. }));
+        assert!(matches!(acl.check_single(&p, "sigma11").unwrap(), AccessDecision::Granted { .. }));
+    }
 }
 
 #[cfg(all(test, feature = "parallel"))]
@@ -2078,3 +2176,4 @@ label = "Read"
         assert!(dave.holds("admin_star"));
     }
 }
+
