@@ -216,6 +216,14 @@ cargo run --example rate_limiter      # Intersection-number rate limiting
 
 ## What's New
 
+### v0.4.0
+- **`schubert::axum` module** — bearer-token `AuthPrincipal` extractor (401 vs 500 split)
+- **Multi-capability grant tokens** — `GrantToken`/`GrantVerifier` with geometric containment (`may()`: write implies read, admin implies all)
+- **`KeyStore`** — file-based Ed25519 seed persistence (`0600`)
+- **Binary wire format** — `to_bytes()`/`from_bytes()` for `CapabilityToken` + `GrantToken`
+- **`check_single()`** — set-membership fast path for per-request checks
+- **`schubert-tsukoshi`** — pure-TypeScript extraction (`@industrialalgebra/schubert-tsukoshi`): zero-dep core, Rust-compatible crypto, `GrantCRDT`
+
 ### v0.3.0
 - **Karpal 0.6.1 + Minuet 0.5.0** — all dependencies now Apache-2.0
 - **Distributed game sync design** — formal mapping, impossibility substantiation

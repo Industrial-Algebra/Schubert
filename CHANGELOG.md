@@ -1,6 +1,58 @@
 # Changelog
 
-## [0.3.0] — Unreleased
+## [0.4.0] — 2026-07-19
+
+### Added
+
+- **`schubert::axum` module** — `AuthPrincipal`, a bearer-token extractor that
+  validates a `GrantToken` from the `Authorization: Bearer <token>` header. Typed
+  rejections split client vs server faults (`AuthError::Unauthorized` → 401,
+  `AuthError::ServerMisconfigured` → 500) with a uniform 401 body that leaks no
+  validation-stage detail. Enabled by the new `axum` feature (pulls `crypto`).
+- **Multi-capability grant tokens** — `crypto::GrantToken`, `GrantCapability`,
+  and `GrantVerifier`. A grant carries several capabilities, each with its
+  Schubert partition, so a verifier answers *does this grant authorize P?* via
+  `GrantVerifier::may(grant, partition)` using geometric containment — write
+  implies read, admin (the max partition) implies all — with **no capability
+  registry** at verification time. Capabilities are canonically sorted before
+  signing, so grant order does not affect the signature.
+- **`crypto::KeyStore`** — file-based Ed25519 seed persistence with load-or-create
+  semantics (`load_or_create` / `load` / `generate_seed`). Atomic against
+  concurrent startup; files created mode `0600` on Unix.
+- **Binary wire format** — `CapabilityToken::to_bytes()` / `from_bytes()` and
+  `GrantToken::to_bytes()` / `from_bytes()`, a length-prefixed format suitable
+  for base64 bearer tokens.
+- **Issuer convenience** — `CapabilityIssuer::from_seed([u8; 32])` (deterministic
+  restoration) and `public_key_hex()` (64-char lowercase hex for display/config).
+- **`AccessController::check_single()`** — a lightweight set-membership fast path
+  for per-request checks that bypasses geometric intersection.
+- **`schubert-tsukoshi`** (separate npm package
+  `@industrialalgebra/schubert-tsukoshi`) — a pure-TypeScript extraction of the
+  access-control model: zero-dependency core (LR tables for Gr(2,4)/Gr(3,6)/
+  Gr(4,8), impossibility detection), an Ed25519 `crypto` subpath with a
+  **Rust-compatible wire format** (tokens interop both directions), and a
+  `protocols` subpath with `GrantCRDT` (replicated grant set over cliffy-tsukoshi's
+  `VectorClock`).
+- **`axum` feature flag** (optional deps `axum`, `base64`; enables `crypto`).
+
+### Documentation
+
+- **Rewrote `api/crypto.md`** — the prior page documented a non-existent API
+  (`serialize()`, wrong `verify_and_extract`, `CapabilityToken` fields that
+  don't exist). Now covers the real surface: grant tokens, `may()` containment,
+  the wire format, and `KeyStore`.
+- **New `api/axum.md`** — the extractor, the 401-vs-500 split, capability-specific
+  authorization via `may()`.
+- **New `api/tsukoshi.md`** — cross-reference to the TypeScript package.
+- **`guide/feature-flags.md`** — added the `axum` feature; expanded the `crypto`
+  description; added a web-service feature combination.
+
+### Changed
+
+- Bumped to `0.4.0` (minor): backward-compatible additions only.
+
+
+## [0.3.0] — 2026-07-04
 
 ### Changed
 - **Karpal upgraded 0.5 → 0.6.1** (Apache-2.0, new `compose_checks()` API)

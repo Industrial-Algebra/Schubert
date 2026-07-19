@@ -1,6 +1,6 @@
 [package]
 name = "schubert"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 rust-version = "1.75"
 description = "Schubert calculus as a practical access control system — quantitative capability-based authorization"
@@ -21,6 +21,7 @@ crypto = ["dep:ed25519-dalek", "dep:rand"]
 karpal-verify = ["dep:karpal-verify", "dep:karpal-schubert-types", "karpal"]
 holographic = ["dep:minuet"]
 surreal = ["dep:amari-surreal"]
+axum = ["dep:axum", "dep:base64", "crypto"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
@@ -39,11 +40,14 @@ karpal-verify = { version = "0.6", optional = true }
 karpal-schubert-types = { version = "0.6", optional = true }
 minuet = { version = "0.5", optional = true }
 amari-surreal = { version = "0.23", optional = true, features = ["experimental-epsilon"] }
+axum = { version = "0.8", optional = true }
+base64 = { version = "0.22", optional = true }
 num-traits = "0.2"
 num-bigint = "0.4"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+tokio = { version = "1", features = ["macros", "rt"] }
 
 [[example]]
 name = "rbac"
@@ -73,6 +77,15 @@ path = "examples/context_aware.rs"
 [[example]]
 name = "rate_limiter"
 path = "examples/rate_limiter.rs"
+
+[[example]]
+name = "generate_ts_lr_tables"
+path = "examples/generate_ts_lr_tables.rs"
+
+[[example]]
+name = "tsukoshi_crypto_vectors"
+path = "examples/tsukoshi_crypto_vectors.rs"
+required-features = ["crypto"]
 
 
 [[bench]]
