@@ -38,6 +38,34 @@ deliberately rebased own branch; plain pushes hit both mirrors fine.
 
 ---
 
+## Code standards — non-negotiable
+
+The IA Rust style, condensed. Full doctrine: `/skill:ia-coding-standards`; review
+checklist: `/skill:ia-ecosystem-audit`.
+
+- **TDD.** Failing test *first*, then implementation. No impl code before a red
+  test. Doc tests on all non-trivial public fns; property tests for algebraic laws.
+- **Compile-time correctness.** Phantom types / newtype wrappers for domain
+  concepts (`pub struct PrincipalId(Namespace);`) — no raw `&str`/`String` where a
+  domain type exists. Exhaustive `match` on every variant, **never** a `_ =>`
+  wildcard (the compiler must catch new variants).
+- **`Result`, never panic.** No `unwrap`/`expect`/`todo!` in library code.
+  Fallible constructors return `Result`.
+- **`thiserror` enums** — one central `error.rs` enum, every variant with
+  `#[error("...")]`. No `Result<_, String>`.
+- **Features are additive only.** `#[cfg(feature)]` *adds* capability, never
+  removes API. Every feature-dependent example needs `required-features` in
+  `Cargo.toml` (else it breaks `cargo test` under default features).
+- **Ecosystem-first.** Compose with amari/karpal/minuet before reinventing —
+  re-export their phantom types. (See the use-don't-recreate table in
+  `/skill:ia-coding-standards` §4.)
+- **Document as you code.** Every public item: summary line, `# Examples`
+  (runnable doc test), `# Errors` (for fallible fns). Doc tests count toward the
+  193-test baseline.
+- **License header** on every `.rs` file: `// SPDX-License-Identifier: Apache-2.0`.
+
+---
+
 ## Verification — run before claiming done
 
 Don't assert "tests pass"; run them and read the output. The CI matrix:
@@ -125,8 +153,8 @@ enables `crypto`). Reference: `book/src/guide/feature-flags.md`.
 
 - **License:** Apache-2.0 + CLA (since v0.2.0). See `/skill:ia-licensing`. Do not
   introduce AGPL deps — the network clause blocked enterprise adoption.
-- **Coding standards:** TDD, phantom types, feature gates, exhaustive enums,
-  composability. `/skill:ia-coding-standards`.
+- **Coding standards:** see *Code standards* above; full doctrine
+  `/skill:ia-coding-standards`, audit checklist `/skill:ia-ecosystem-audit`.
 - **Toolchain:** nightly Rust (`rust-toolchain.toml`); rustfmt + clippy components.
 - **Dependencies:** crates.io version deps (not path deps) for public release.
 - **Mirror:** `origin` dual-pushes to GitHub + Forgejo (`king-ghidorah`). See
