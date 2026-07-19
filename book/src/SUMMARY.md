@@ -31,6 +31,8 @@
 - [Stability Analysis](./api/stability.md)
 - [Audit & Error](./api/audit.md)
 - [Proof-Carrying Tokens](./api/crypto.md)
+- [Axum Integration](./api/axum.md)
+- [schubert-tsukoshi (TypeScript)](./api/tsukoshi.md)
 - [WebAssembly](./api/wasm.md)
 
 # Design
