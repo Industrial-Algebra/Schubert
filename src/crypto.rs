@@ -33,7 +33,9 @@
 //! ```
 
 use crate::{CapabilityId, PrincipalId, Result, SchubertError};
-use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+use ed25519_dalek::{
+    Signature, Signer, SigningKey, VerifyingKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
+};
 use rand::rngs::OsRng;
 
 const ISSUER_KEY_LEN: usize = PUBLIC_KEY_LENGTH;
@@ -72,9 +74,7 @@ impl CapabilityToken {
     pub fn to_bytes(token: &Self) -> Vec<u8> {
         let p = token.principal.as_str().as_bytes();
         let c = token.capability.as_str().as_bytes();
-        let mut buf = Vec::with_capacity(
-            2 + p.len() + 2 + c.len() + ISSUER_KEY_LEN + SIG_LEN,
-        );
+        let mut buf = Vec::with_capacity(2 + p.len() + 2 + c.len() + ISSUER_KEY_LEN + SIG_LEN);
         buf.extend_from_slice(&(p.len() as u16).to_be_bytes());
         buf.extend_from_slice(p);
         buf.extend_from_slice(&(c.len() as u16).to_be_bytes());
@@ -469,8 +469,7 @@ impl GrantVerifier {
         let bytes: [u8; 32] = public_key[..32]
             .try_into()
             .expect("public key must be 32 bytes");
-        let verifying_key =
-            VerifyingKey::from_bytes(&bytes).expect("invalid Ed25519 public key");
+        let verifying_key = VerifyingKey::from_bytes(&bytes).expect("invalid Ed25519 public key");
         Self { verifying_key }
     }
 
@@ -523,14 +522,15 @@ impl GrantVerifier {
     ///
     /// # Properties
     ///
-    /// - **Write implies read:** If [2] is granted, [1] is implied
-    ///   (because [1] ≤ [2] component-wise).
-    /// - **Admin implies all:** If [4,4,4,4] is granted on Gr(4,8), every
+    /// - **Write implies read:** If `[2]` is granted, `[1]` is implied
+    ///   (because `[1] ≤ [2]` component-wise).
+    /// - **Admin implies all:** If `[4,4,4,4]` is granted on Gr(4,8), every
     ///   partition is implied (because all partitions are ≤ the max).
     pub fn may(&self, grant: &GrantToken, cap_partition: &[usize]) -> bool {
-        grant.capabilities.iter().any(|cap| {
-            partitions_le(cap_partition, &cap.partition)
-        })
+        grant
+            .capabilities
+            .iter()
+            .any(|cap| partitions_le(cap_partition, &cap.partition))
     }
 }
 
@@ -625,9 +625,7 @@ impl KeyStore {
 
     fn seed_from_bytes(bytes: &[u8]) -> Result<[u8; 32]> {
         bytes.try_into().map_err(|_| {
-            SchubertError::CryptoVerificationFailed(
-                "key file must be exactly 32 bytes".into(),
-            )
+            SchubertError::CryptoVerificationFailed("key file must be exactly 32 bytes".into())
         })
     }
 
@@ -694,9 +692,8 @@ fn read_u8(buf: &[u8], pos: &mut usize) -> Result<usize> {
 
 fn read_str(buf: &[u8], pos: &mut usize, len: usize) -> Result<String> {
     let bytes = read_bytes(buf, pos, len)?;
-    String::from_utf8(bytes.to_vec()).map_err(|e| {
-        SchubertError::CryptoVerificationFailed(format!("non-utf8 token field: {e}"))
-    })
+    String::from_utf8(bytes.to_vec())
+        .map_err(|e| SchubertError::CryptoVerificationFailed(format!("non-utf8 token field: {e}")))
 }
 
 fn read_bytes<'a>(buf: &'a [u8], pos: &mut usize, len: usize) -> Result<&'a [u8]> {
@@ -879,10 +876,7 @@ mod tests {
     fn grant_may_single_cap() {
         let issuer = CapabilityIssuer::generate();
         let grant = issuer
-            .issue_grant(
-                "alice",
-                &[grant_cap("memory:read", vec![1])],
-            )
+            .issue_grant("alice", &[grant_cap("memory:read", vec![1])])
             .unwrap();
 
         let verifier = GrantVerifier::new(issuer.public_key());
@@ -895,10 +889,7 @@ mod tests {
         // Geometric containment: σ₂ ≥ σ₁ component-wise, so write implies read.
         let issuer = CapabilityIssuer::generate();
         let grant = issuer
-            .issue_grant(
-                "alice",
-                &[grant_cap("memory:write", vec![2])],
-            )
+            .issue_grant("alice", &[grant_cap("memory:write", vec![2])])
             .unwrap();
 
         let verifier = GrantVerifier::new(issuer.public_key());
@@ -912,10 +903,7 @@ mod tests {
         // σ₄₄₄₄ is the maximum partition — everything ≤ it component-wise.
         let issuer = CapabilityIssuer::generate();
         let grant = issuer
-            .issue_grant(
-                "alice",
-                &[grant_cap("admin", vec![4, 4, 4, 4])],
-            )
+            .issue_grant("alice", &[grant_cap("admin", vec![4, 4, 4, 4])])
             .unwrap();
 
         let verifier = GrantVerifier::new(issuer.public_key());
@@ -949,10 +937,7 @@ mod tests {
     fn grant_tampered_caps_fails_verify() {
         let issuer = CapabilityIssuer::generate();
         let mut grant = issuer
-            .issue_grant(
-                "alice",
-                &[grant_cap("memory:read", vec![1])],
-            )
+            .issue_grant("alice", &[grant_cap("memory:read", vec![1])])
             .unwrap();
 
         grant.capabilities.push(GrantCapability {
@@ -971,10 +956,7 @@ mod tests {
 
         let single = issuer.issue("alice", "read:data").unwrap();
         let grant = issuer
-            .issue_grant(
-                "alice",
-                &[grant_cap("read:data", vec![1])],
-            )
+            .issue_grant("alice", &[grant_cap("read:data", vec![1])])
             .unwrap();
 
         // Both verify cryptographically

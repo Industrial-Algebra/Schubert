@@ -78,6 +78,15 @@ path = "examples/context_aware.rs"
 name = "rate_limiter"
 path = "examples/rate_limiter.rs"
 
+[[example]]
+name = "generate_ts_lr_tables"
+path = "examples/generate_ts_lr_tables.rs"
+
+[[example]]
+name = "tsukoshi_crypto_vectors"
+path = "examples/tsukoshi_crypto_vectors.rs"
+required-features = ["crypto"]
+
 
 [[bench]]
 name = "computation_paths"
