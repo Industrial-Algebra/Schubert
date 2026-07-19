@@ -50,10 +50,12 @@ fn main() {
     let mut tampered = issuer
         .issue_grant("carol", &[(CapabilityId::new("memory:read"), vec![1])])
         .unwrap();
-    tampered.capabilities.push(schubert::crypto::GrantCapability {
-        id: CapabilityId::new("memory:admin"),
-        partition: vec![4, 4, 4, 4],
-    });
+    tampered
+        .capabilities
+        .push(schubert::crypto::GrantCapability {
+            id: CapabilityId::new("memory:admin"),
+            partition: vec![4, 4, 4, 4],
+        });
     let tampered_bytes = GrantToken::to_bytes(&tampered);
 
     println!("{{");

@@ -1482,8 +1482,14 @@ mod tests {
         // sigma2_0 and sigma11 together are impossible geometrically,
         // but check_single bypasses geometry — it only checks set membership.
         // Each individually is still held.
-        assert!(matches!(acl.check_single(&p, "sigma2_0").unwrap(), AccessDecision::Granted { .. }));
-        assert!(matches!(acl.check_single(&p, "sigma11").unwrap(), AccessDecision::Granted { .. }));
+        assert!(matches!(
+            acl.check_single(&p, "sigma2_0").unwrap(),
+            AccessDecision::Granted { .. }
+        ));
+        assert!(matches!(
+            acl.check_single(&p, "sigma11").unwrap(),
+            AccessDecision::Granted { .. }
+        ));
     }
 }
 
@@ -2176,4 +2182,3 @@ label = "Read"
         assert!(dave.holds("admin_star"));
     }
 }
-

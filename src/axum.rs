@@ -28,15 +28,15 @@
 //! }
 //! ```
 //!
-//! For capability-specific authorization, call [`GrantVerifier::may`] directly
+//! For capability-specific authorization, call `GrantVerifier::may` directly
 //! in the handler (extract the verifier via a second `Extension` argument).
 
 use crate::crypto::{GrantToken, GrantVerifier};
 use axum::{
-    Extension,
     extract::FromRequestParts,
-    http::{StatusCode, request::Parts},
+    http::{request::Parts, StatusCode},
     response::IntoResponse,
+    Extension,
 };
 use std::sync::Arc;
 
@@ -51,7 +51,7 @@ use std::sync::Arc;
 /// ```
 ///
 /// On success the grant is fully signature-verified and the handler may
-/// consult [`GrantVerifier::may`] for capability-specific authorization.
+/// consult `GrantVerifier::may` for capability-specific authorization.
 #[derive(Debug, Clone)]
 pub struct AuthPrincipal(pub GrantToken);
 
@@ -61,7 +61,7 @@ pub struct AuthPrincipal(pub GrantToken);
 /// **server** misconfiguration (verifier layer not installed → `500`). The
 /// carried detail string is **diagnostic only** — it is never sent to the
 /// client in the response body, to avoid leaking how far a forged token got.
-/// Inspect it by handling the [`Rejection`](axum::extract::rejection::Rejection)
+/// Inspect it by handling the `Rejection`
 /// before it becomes a response, or via [`Debug`](std::fmt::Debug).
 #[derive(Debug)]
 pub enum AuthError {
@@ -109,8 +109,8 @@ where
                 .await
                 .map_err(|_| {
                     AuthError::ServerMisconfigured(
-                        "auth state not installed — add Extension<Arc<GrantVerifier>> to the router",
-                    )
+                "auth state not installed — add Extension<Arc<GrantVerifier>> to the router",
+            )
                 })?;
 
         let header = parts
@@ -123,7 +123,7 @@ where
             .strip_prefix("Bearer ")
             .ok_or(AuthError::Unauthorized("expected 'Bearer <token>' scheme"))?;
 
-        use base64::{Engine, engine::general_purpose::STANDARD as B64};
+        use base64::{engine::general_purpose::STANDARD as B64, Engine};
         let bytes = B64
             .decode(token.trim())
             .map_err(|_| AuthError::Unauthorized("invalid base64 token"))?;
@@ -154,7 +154,7 @@ mod tests {
 
     /// Base64 bearer payload for a grant, exactly as a client would send it.
     fn bearer(grant: &GrantToken) -> String {
-        use base64::{Engine, engine::general_purpose::STANDARD as B64};
+        use base64::{engine::general_purpose::STANDARD as B64, Engine};
         B64.encode(GrantToken::to_bytes(grant))
     }
 
@@ -181,8 +181,7 @@ mod tests {
 
     #[test]
     fn error_misconfigured_maps_to_500() {
-        let resp =
-            AuthError::ServerMisconfigured("verifier missing").into_response();
+        let resp = AuthError::ServerMisconfigured("verifier missing").into_response();
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 
