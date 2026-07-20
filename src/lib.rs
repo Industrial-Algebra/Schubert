@@ -173,5 +173,6 @@ pub use multi::MultiController;
 pub use principal::{Principal, PrincipalId};
 pub use rate_limit::RateLimiter;
 pub use stability::{
-    analyze_stability, stable_capabilities_at, StabilityBreakpoint, StabilityReport, TrustLevel,
+    analyze_composed_stability, analyze_stability, stable_capabilities_at, ComposedStabilityReport,
+    InterfaceCapabilities, StabilityBreakpoint, StabilityReport, TrustLevel,
 };
