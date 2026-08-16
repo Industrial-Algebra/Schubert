@@ -299,6 +299,75 @@ real consumer usage.
 
 ---
 
+## Near-Term (v0.5.0)
+
+### 20. GrantToken Expiry & Nonce (Ijima-driven)
+
+**Motivation (field friction, from the first real consumer):** Ijima
+v0.2.0 hardened its deployment path and hit two `GrantToken` gaps that
+policy-layer features cannot cover:
+
+1. **No token-carried expiry.** A bearer is valid until the issuer key
+dies. Ijima built a store-backed revocation list for *incidents*
+(kill a leaked token now — `docs/adr/token-revocation.md` in the Ijima
+repo), but *routine* deprovisioning (service-feed rotation, principal
+offboarding) wants TTLs the **verifier can check standalone** — critical
+for the v0.3 federation shape, where satellite instances verify grants
+without phoning home to a controller.
+2. **No nonce/jti.** `issue_grant` signs `(principal, capabilities,
+issuer_key)` — so re-issuing the same grant from the same seed yields a
+**byte-identical bearer**. A revoked token therefore cannot be cleanly
+re-issued: the revocation hash kills the re-issue too. A random nonce
+makes every issuance distinct.
+
+**Relationship to existing work:** the policy layer already has temporal
+access control (`Capability::expires_at`, `check_temporal()`, trust
+decay — item #8), but that requires the `AccessController` at check
+time. This item is the **crypto layer**: standalone, proof-carrying,
+verifier-side only.
+
+**Spec sketch:**
+
+- `GrantToken` gains `expires_at_unix: Option<u64>` (None = never) and
+  `nonce: [u8; 16]` (random at issue).
+- Both fields are covered by the signature: extend the canonical signing
+  message in `issue_grant` and `GrantVerifier::verify` identically.
+- The nonce is **not** part of the canonical capability sort — sort stays
+  `(partition, id)`; distinctness comes from the signed nonce alone.
+- Wire format: extend `GrantToken::to_bytes`/`from_bytes`. Breaking change
+to the blob layout is acceptable in a 0.x minor (Ijima re-mints; no
+external bearers exist beyond it).
+- `GrantVerifier::verify_at(grant, now_unix)` — deterministic,
+clock-injected variant — with `verify(grant)` delegating via
+`SystemTime::now()`. Expired ⇒ the same error class as a bad signature.
+- Issuer surface: `issue_grant` defaults `nonce = random`,
+  `expires_at = None`; add `issue_grant_with_expiry(principal, caps,
+  expires_at)` (and/or a builder) for explicit control. Deterministic
+  issuance for tests: allow injecting the nonce.
+- **tsukoshi parity:** mirror in
+  `@industrialalgebra/schubert-tsukoshi` (crypto subpath), including the
+  cross-language fixture test (Rust-issued ⇒ TS-verified, both expiry and
+  nonce paths).
+
+**Tests:**
+
+- Round trip: future expiry verifies, past expiry rejected,
+  `verify_at` determinism (same grant, injected clocks).
+- Distinctness: two `issue_grant` calls with identical inputs produce
+  different bytes, both verify (nonce works).
+- Tamper: flipping expiry or nonce bytes ⇒ signature failure.
+- Sort stability: capability ordering unchanged by nonce randomness.
+- Cross-language fixture (tsukoshi).
+
+**References:** Ijima `docs/adr/token-revocation.md` (complementary
+rationale — revocation = incidents, expiry = deprovisioning), Ijima
+`docs/adr/grant-token-migration.md` (consumer context), Schubert
+`docs/handoff-multi-capability-tokens.md` (GrantToken origin).
+
+**Scope:** ~2–4 days including tsukoshi parity.
+
+---
+
 ## Research Directions (v0.5.0+ and Beyond)
 
 ### 17. Compositional Wall-Crossing
