@@ -1,11 +1,14 @@
 # Schubert — Directions
 
-> **v0.3.0 Snapshot** — All 14 core roadmap items complete. Karpal/Minuet
-> upgraded to Apache-2.0. Formal mapping substantiated via distributed game
-> sync design. 14 Proserpina critique findings addressed.
+> **v0.4.0 Snapshot** — All 14 core roadmap items complete, plus the v0.4.0
+> consumer-driven package: multi-capability `GrantToken`s, `schubert::axum`,
+> `KeyStore`, binary wire format, `check_single`, and the
+> `schubert-tsukoshi` npm package. Karpal/Minuet upgraded to Apache-2.0.
+> Formal mapping substantiated via distributed game sync design. 14 Proserpina
+> critique findings addressed.
 > See [CHANGELOG.md](../CHANGELOG.md) for version history.
 
-**Version:** 0.3.0 — Clean AGPL break. Formal foundation. Apache-2.0 throughout.
+**Version:** 0.4.0 — Consumer-driven grants. Apache-2.0 throughout.
 **Gitflow:** `main` (releases) ← `develop` (integration) ← `feature/*` (work)
 
 ---
@@ -28,6 +31,10 @@ optional `karpal-proof`, `karpal-verify`, `serde`, `rayon`, `toml`).
 - ✅ Proof-carrying capabilities (Ed25519 cryptographic tokens)
 - ✅ Constitutional verification (Karpal 0.5.0 integration)
 - ✅ Apache-2.0 dual-licensing
+- ✅ Multi-capability grant tokens + `GrantVerifier` (v0.4.0)
+- ✅ `schubert::axum` bearer extractor (v0.4.0)
+- ✅ `KeyStore`, binary wire format, `check_single` (v0.4.0)
+- ✅ `schubert-tsukoshi` npm package (v0.4.0)
 
 ---
 
@@ -214,9 +221,15 @@ each trust level.
 
 ---
 
-## Near-Term (v0.4.0)
+## Shipped (v0.4.0)
 
-### 15. schubert-tsukoshi — Pure TypeScript Access Control
+### 15. schubert-tsukoshi — Pure TypeScript Access Control — ✅ DONE (v0.4.0)
+
+**Shipped** as [`@industrialalgebra/schubert-tsukoshi`](https://www.npmjs.com/package/@industrialalgebra/schubert-tsukoshi):
+zero-dependency core (LR tables for Gr(2,4)/Gr(3,6)/Gr(4,8), impossibility
+detection), an Ed25519 `crypto` subpath with a Rust-compatible wire format
+(tokens interop both directions), and a `protocols` subpath with `GrantCRDT`
+(replicated grant set over cliffy-tsukoshi's `VectorClock`).
 
 **Goal:** Extract Schubert's core access control model into a zero-dependency
 TypeScript package, following the cliffy-tsukoshi pattern.
@@ -249,7 +262,14 @@ TypeScript package, following the cliffy-tsukoshi pattern.
 the pattern this follows (pure TS extraction of geometric math from a Rust
 framework, with distributed protocols).
 
-### 16. Consumer-Driven API Polish (from Ijima Integration)
+### 16. Consumer-Driven API Polish (from Ijima Integration) — ✅ DONE (v0.4.0)
+
+**Shipped in full** (all six items): `axum` module (`AuthPrincipal` bearer
+extractor), multi-capability `GrantToken`/`GrantVerifier` with geometric
+containment (`may`), `crypto::KeyStore` (0600, atomic load-or-create), binary
+wire format on both token types, `from_seed`/`public_key_hex`, and
+`check_single`. Dominic's federation routing (M3) builds on the grant
+machinery — the second consumer.
 
 **Motivation:** Ijima — Schubert's first real consumer — revealed integration
 friction points. Each item below eliminates custom boilerplate Ijima had to
@@ -299,9 +319,53 @@ real consumer usage.
 
 ---
 
+## Near-Term (v0.5.0) — Grant Lifecycle (consumer-driven)
+
+### 20. Grant Lifecycle — expiry, revocation, policy-issuance linkage
+
+**Origin:** The 0.4.0 consumer wave (Ijima → Dominic) shipped grants, but
+three lifecycle gaps are now pressing for the next consumers: **Wallace
+extensions** (capability-gated extension packages), **Dominic federation**
+(peer grants across instances), and **Ijima** (peer grants + the deferred
+`capability_policy_ref`). Each item below is verified against the 0.4.0 code.
+
+**1. `GrantToken` expiry**
+`GrantToken` (crypto.rs) has no expiry; temporal expiry exists only on the
+controller-path `Capability` (#8). Wallace wants session-scoped extension
+grants ("dies with the session"); Dominic wants time-boxed federation
+grants. Port `expires_at` + `with_expiry` + expiry-aware `verify` to grants.
+
+**2. Grant-aware CRDT revocation**
+`CrdtGrant` (crdt.rs) tracks a single `CapabilityId` — pre-`GrantToken`
+machinery. Multi-participant Wallace needs revoke-grant → converges across
+session participants; Ijima needs peer revocation; Dominic needs peer
+revocation converging across federation state. Either upgrade `CrdtGrant` to
+carry a grant id, or add revocation registries (tombstones) keyed by grant
+hash. `GrantCRDT` (tsukoshi) will need the parallel treatment.
+
+**3. Policy → issuance linkage**
+The controller path has `from_policy_toml` (#3); grants have
+`CapabilityIssuer` — but nothing connects them. The seam: policy.toml
+drives *what grants may be issued* (constrained issuance), so Ijima can own
+policy while principals carry grants — the capability-driven control-API
+design (Dominic ROADMAP §3.5 anticipates this).
+
+**Scope:** ~1 week. Same character as #16 — each item eliminates boilerplate
+a consumer has written or is about to write. Directly validated by the
+Wallace/Dominic/Ijima 2026-08 build wave.
+
+---
+
 ## Research Directions (v0.5.0+ and Beyond)
 
 ### 17. Compositional Wall-Crossing
+
+**Expanded:** see
+[`docs/design/wall-crossing-diffusion-composition.md`](design/wall-crossing-diffusion-composition.md)
+— the v0.5.0 framing via diffusion-LM composition for Quantizon (BPS
+non-additivity as a candidate formalism for emergence; tropical bridge). A
+KS-type composition probe (`analyze_composed_stability`) is in flight
+(PR #37, CI-green).
 
 **Origin:** The stability-engine rabbit hole (2026-07-06) identified this as
 Schubert's deepest open theoretical question.
