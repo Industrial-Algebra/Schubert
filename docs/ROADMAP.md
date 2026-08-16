@@ -365,16 +365,6 @@ computations, making large-Grassmannian access control practical.
 
 **Scope:** Depends on Borsalino reaching ecosystem adoption. Long-term.
 
-### 14. Access Control for Holographic Memory
-
-> **Note:** Blocked pending Minuet relicensing.
-
-Integration with Minuet-style holographic memory systems. Capabilities are
-binding vectors in a holographic reduced representation. Access is granted
-when the query vector's similarity to the capability vector exceeds the trust
-threshold. The wall-crossing engine determines which memories are accessible
-at each trust level.
-
 ---
 
 ## Design Principles (Preserved Across All Directions)
