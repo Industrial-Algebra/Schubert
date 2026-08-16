@@ -1,18 +1,15 @@
 # Contributing to Schubert
 
 Thank you for your interest in contributing! Schubert is an Industrial Algebra
-project, dual-licensed under AGPL v3 and a commercial license.
+project, licensed under Apache-2.0.
 
 ## Contributor License Agreement (CLA)
 
-Schubert is dual-licensed (AGPL v3 + commercial). To enable this model,
-**all contributors must sign a Contributor License Agreement (CLA)**.
+**All contributors must sign a Contributor License Agreement (CLA).**
 
 The CLA grants Industrial Algebra the right to relicense your contributions
-under the commercial license, while you retain full copyright ownership of
-your contributions. Without a CLA, your contributions can only be used under
-AGPL v3 terms, which would prevent Industrial Algebra from offering a
-commercial license for the combined work.
+under any license, while you retain full copyright ownership. This enables
+Industrial Algebra to offer commercial licensing for the combined work.
 
 ### How to Sign
 
@@ -52,4 +49,4 @@ cargo clippy --all-targets
 ## License
 
 By contributing, you agree that your contributions will be licensed under
-the same dual-licensing model as the project (AGPL v3 + commercial).
+Apache-2.0, the same license as the project.

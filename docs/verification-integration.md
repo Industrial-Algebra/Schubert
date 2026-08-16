@@ -303,6 +303,6 @@ Golden file regeneration: `cargo test -p schubert --features karpal-verify -- --
 
 - [Karpal Roadmap](../../karpal/ROADMAP.md) — Phase 12 (verification backends), Phase 15 (Schubert types), Phase 17 (ecosystem integration)
 - [Borsalino verification integration](../../Borsalino/docs/verification-integration.md) — GPU compute verification
-- [Schubert Karpal Integration (May 14, 2026)](../../karpal/HANDOFF.md) — Initial karpal-proof integration notes
+- [Schubert Karpal Integration (May 2026)](https://github.com/Industrial-Algebra/Karpal) — karpal-proof integration
 - [amari-flynn documentation](https://github.com/Industrial-Algebra/amari-flynn) — Statistical verification backend
 - Fulton, *Young Tableaux* — Schubert calculus foundations

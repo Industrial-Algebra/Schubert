@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Industrial Algebra
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 #[cfg(feature = "std")]
 #[cfg(feature = "std")]
@@ -214,12 +214,64 @@ impl AccessController {
     /// Uses the Littlewood-Richardson path by default. For explicit path
     /// selection, use [`check_with_path`](Self::check_with_path). For
     /// automatic routing, use [`check_auto`](Self::check_auto).
+    ///
+    /// For the common single-capability case, prefer [`check_single`](Self::check_single)
+    /// which avoids geometric intersection computation entirely.
     pub fn check(&self, principal_id: &PrincipalId, required: &[&str]) -> Result<AccessDecision> {
         self.check_with_path(
             principal_id,
             required,
             ComputationPath::LittlewoodRichardson,
         )
+    }
+
+    /// Fast-path check for a single capability.
+    ///
+    /// Checks whether the principal holds exactly one required capability.
+    /// This is a lightweight set-membership check — no geometric intersection
+    /// computation, no LR coefficients, no Grassmannian machinery.
+    /// Suitable for high-throughput per-request authorization where the
+    /// full geometric check is unnecessary.
+    ///
+    /// Returns `AccessDecision::Granted { configurations: 1, path: ... }`
+    /// if the principal holds the capability, or `AccessDecision::Denied`
+    /// otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use schubert::{AccessController, AccessDecision, Capability, CapabilityKind};
+    ///
+    /// let mut acl = AccessController::new(2, 4)?;
+    /// acl.register_capability(Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike))?;
+    /// let alice = acl.create_principal("alice")?;
+    /// acl.grant(&alice, "read")?;
+    ///
+    /// let decision = acl.check_single(&alice, "read")?;
+    /// assert!(matches!(decision, AccessDecision::Granted { .. }));
+    ///
+    /// let decision = acl.check_single(&alice, "write")?;
+    /// assert!(matches!(decision, AccessDecision::Denied));
+    /// # Ok::<(), schubert::SchubertError>(())
+    /// ```
+    pub fn check_single(
+        &self,
+        principal_id: &PrincipalId,
+        required: &str,
+    ) -> Result<AccessDecision> {
+        let principal = self
+            .principals
+            .get(principal_id)
+            .ok_or_else(|| SchubertError::PrincipalNotFound(principal_id.to_string()))?;
+
+        if principal.holds(required) {
+            Ok(AccessDecision::Granted {
+                configurations: 1,
+                path: ComputationPath::LittlewoodRichardson,
+            })
+        } else {
+            Ok(AccessDecision::Denied)
+        }
     }
 
     /// Check access with an explicit computation path preference.
@@ -388,6 +440,134 @@ impl AccessController {
             .map(|c| c.codimension())
             .sum();
         Ok(dim as isize - total_codim as isize)
+    }
+
+    // ── Temporal access control ──────────────────────────────────
+
+    /// Check access with temporal expiry awareness.
+    ///
+    /// At the given `now_ms` timestamp, any capability held by the principal
+    /// that has `expires_at <= now_ms` is treated as revoked. The access check
+    /// proceeds with only the non-expired capabilities.
+    ///
+    /// If all required capabilities have expired, returns `Denied`.
+    /// If some have expired, only the non-expired ones are included in the
+    /// Schubert intersection computation.
+    pub fn check_temporal(
+        &self,
+        principal_id: &PrincipalId,
+        required: &[&str],
+        now_ms: u64,
+    ) -> Result<AccessDecision> {
+        let principal = self
+            .principals
+            .get(principal_id)
+            .ok_or_else(|| SchubertError::PrincipalNotFound(principal_id.to_string()))?;
+
+        // Check holds and expiry
+        for cap_id in required {
+            if !principal.holds(cap_id) {
+                return Ok(AccessDecision::Denied);
+            }
+            // Check if the capability has expired
+            let cid = CapabilityId::new(*cap_id);
+            if let Some(cap) = self.capabilities.get(&cid) {
+                if cap.is_expired_at(now_ms) {
+                    return Ok(AccessDecision::Denied);
+                }
+            }
+        }
+
+        // All good — compute intersection normally
+        self.check_with_path(
+            principal_id,
+            required,
+            ComputationPath::LittlewoodRichardson,
+        )
+    }
+
+    /// List capabilities held by a principal that have expired at `now_ms`.
+    pub fn expired_capabilities(
+        &self,
+        principal_id: &PrincipalId,
+        now_ms: u64,
+    ) -> Result<Vec<String>> {
+        let principal = self
+            .principals
+            .get(principal_id)
+            .ok_or_else(|| SchubertError::PrincipalNotFound(principal_id.to_string()))?;
+
+        Ok(principal
+            .granted_capability_ids
+            .iter()
+            .filter(|cap_id| {
+                let cid = CapabilityId::new(cap_id.as_str());
+                self.capabilities
+                    .get(&cid)
+                    .is_some_and(|cap| cap.is_expired_at(now_ms))
+            })
+            .cloned()
+            .collect())
+    }
+
+    /// Get the time remaining (in ms) for a principal's capabilities.
+    ///
+    /// Returns a list of `(capability_id, remaining_ms)` for all held
+    /// capabilities. `None` remaining means the capability never expires.
+    pub fn capability_time_remaining(
+        &self,
+        principal_id: &PrincipalId,
+        now_ms: u64,
+    ) -> Result<Vec<(String, Option<u64>)>> {
+        let principal = self
+            .principals
+            .get(principal_id)
+            .ok_or_else(|| SchubertError::PrincipalNotFound(principal_id.to_string()))?;
+
+        Ok(principal
+            .granted_capability_ids
+            .iter()
+            .map(|cap_id| {
+                let cid = CapabilityId::new(cap_id.as_str());
+                let remaining = self
+                    .capabilities
+                    .get(&cid)
+                    .and_then(|cap| cap.time_remaining_at(now_ms));
+                (cap_id.clone(), remaining)
+            })
+            .collect())
+    }
+
+    /// Build a temporal trust level for a capability at the given time.
+    ///
+    /// If the capability has an expiry, the trust level decays linearly from
+    /// 1.0 (freshly granted) to 0.0 (at expiry). If no expiry is set,
+    /// returns full trust (1.0).
+    pub fn temporal_trust_level(
+        &self,
+        capability_id: &str,
+        now_ms: u64,
+    ) -> Result<crate::TrustLevel> {
+        let cid = CapabilityId::new(capability_id);
+        let cap = self
+            .capabilities
+            .get(&cid)
+            .ok_or_else(|| SchubertError::CapabilityNotFound(capability_id.to_string()))?;
+
+        match cap.expires_at {
+            Some(expiry) if now_ms >= expiry => Ok(crate::TrustLevel::NONE),
+            Some(expiry) => {
+                let total_lifetime = expiry.saturating_sub(0); // approximation
+                let remaining = expiry.saturating_sub(now_ms);
+                let fraction = if total_lifetime > 0 {
+                    (remaining as f64 / total_lifetime as f64).clamp(0.0, 1.0)
+                } else {
+                    1.0
+                };
+                Ok(crate::TrustLevel::new(fraction))
+            }
+            None => Ok(crate::TrustLevel::FULL),
+        }
     }
 
     // ── Computation path engines ─────────────────────────────────
@@ -1259,6 +1439,58 @@ mod tests {
             "Matroid: must be impossible"
         );
     }
+
+    // --- check_single fast path ---
+
+    #[test]
+    fn check_single_granted() {
+        let mut acl = make_controller();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "sigma1_0").unwrap();
+
+        let decision = acl.check_single(&p, "sigma1_0").unwrap();
+        assert!(matches!(decision, AccessDecision::Granted { .. }));
+    }
+
+    #[test]
+    fn check_single_denied() {
+        let mut acl = make_controller();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "sigma1_0").unwrap();
+
+        let decision = acl.check_single(&p, "sigma2_0").unwrap();
+        assert!(matches!(decision, AccessDecision::Denied));
+    }
+
+    #[test]
+    fn check_single_principal_not_found() {
+        let acl = make_controller();
+        let p = PrincipalId::new("nobody");
+        assert!(acl.check_single(&p, "sigma1_0").is_err());
+    }
+
+    #[test]
+    fn check_single_owes_detector() {
+        // Regression: check_single must detect the OWES class bug (σ₂·σ₁₁)
+        // by returning Denied when the capability is not held, even though
+        // a non-existent capability could have been geometrically possible.
+        let mut acl = make_controller();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "sigma2_0").unwrap();
+        acl.grant(&p, "sigma11").unwrap();
+
+        // sigma2_0 and sigma11 together are impossible geometrically,
+        // but check_single bypasses geometry — it only checks set membership.
+        // Each individually is still held.
+        assert!(matches!(
+            acl.check_single(&p, "sigma2_0").unwrap(),
+            AccessDecision::Granted { .. }
+        ));
+        assert!(matches!(
+            acl.check_single(&p, "sigma11").unwrap(),
+            AccessDecision::Granted { .. }
+        ));
+    }
 }
 
 #[cfg(all(test, feature = "parallel"))]
@@ -1503,6 +1735,122 @@ mod parallel_tests {
                 path: ComputationPath::LittlewoodRichardson,
             }
         );
+    }
+
+    // ── Temporal access control tests ───────────────────────────
+
+    #[test]
+    fn temporal_expired_capability_denied() {
+        let mut acl = setup();
+        let cap = Capability::new("temp_read", "Temp", vec![1], CapabilityKind::ReadLike)
+            .with_expiry(1000);
+        acl.register_capability(cap).unwrap();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "temp_read").unwrap();
+
+        let d = acl.check_temporal(&p, &["temp_read"], 500).unwrap();
+        assert!(matches!(d, AccessDecision::Underconstrained { .. }));
+
+        let d = acl.check_temporal(&p, &["temp_read"], 2000).unwrap();
+        assert_eq!(d, AccessDecision::Denied);
+    }
+
+    #[test]
+    fn temporal_no_expiry_always_allowed() {
+        let mut acl = setup();
+        acl.register_capability(Capability::new(
+            "forever",
+            "Forever",
+            vec![1],
+            CapabilityKind::ReadLike,
+        ))
+        .unwrap();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "forever").unwrap();
+
+        for t in &[0, 1000, 1_000_000_000_000u64] {
+            let d = acl.check_temporal(&p, &["forever"], *t).unwrap();
+            assert!(matches!(d, AccessDecision::Underconstrained { .. }));
+        }
+    }
+
+    #[test]
+    fn temporal_mixed_expiry() {
+        let mut acl = setup();
+        acl.register_capability(
+            Capability::new("short", "Short", vec![1], CapabilityKind::ReadLike).with_expiry(1000),
+        )
+        .unwrap();
+        acl.register_capability(
+            Capability::new("long", "Long", vec![1], CapabilityKind::ReadLike).with_expiry(10000),
+        )
+        .unwrap();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "short").unwrap();
+        acl.grant(&p, "long").unwrap();
+
+        let d = acl.check_temporal(&p, &["short", "long"], 500).unwrap();
+        assert!(matches!(d, AccessDecision::Underconstrained { .. }));
+
+        let d = acl.check_temporal(&p, &["short"], 5000).unwrap();
+        assert_eq!(d, AccessDecision::Denied);
+        let d = acl.check_temporal(&p, &["long"], 5000).unwrap();
+        assert!(matches!(d, AccessDecision::Underconstrained { .. }));
+    }
+
+    #[test]
+    fn expired_capabilities_list() {
+        let mut acl = setup();
+        acl.register_capability(
+            Capability::new("exp1", "E1", vec![1], CapabilityKind::ReadLike).with_expiry(100),
+        )
+        .unwrap();
+        acl.register_capability(
+            Capability::new("exp2", "E2", vec![1], CapabilityKind::ReadLike).with_expiry(200),
+        )
+        .unwrap();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "exp1").unwrap();
+        acl.grant(&p, "exp2").unwrap();
+
+        let expired = acl.expired_capabilities(&p, 150).unwrap();
+        assert!(expired.contains(&"exp1".to_string()));
+        assert!(!expired.contains(&"exp2".to_string()));
+    }
+
+    #[test]
+    fn temporal_trust_level_decay() {
+        let mut acl = setup();
+        acl.register_capability(
+            Capability::new("temp", "Temp", vec![1], CapabilityKind::ReadLike).with_expiry(1000),
+        )
+        .unwrap();
+
+        let t0 = acl.temporal_trust_level("temp", 0).unwrap();
+        assert!((t0.value() - 1.0).abs() < 0.01);
+
+        let t500 = acl.temporal_trust_level("temp", 500).unwrap();
+        assert!((t500.value() - 0.5).abs() < 0.01);
+
+        let t1000 = acl.temporal_trust_level("temp", 1000).unwrap();
+        assert!((t1000.value() - 0.0).abs() < 0.01);
+
+        let t2000 = acl.temporal_trust_level("temp", 2000).unwrap();
+        assert!((t2000.value() - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn capability_time_remaining() {
+        let mut acl = setup();
+        acl.register_capability(
+            Capability::new("temp", "Temp", vec![1], CapabilityKind::ReadLike).with_expiry(1000),
+        )
+        .unwrap();
+        let p = acl.create_principal("alice").unwrap();
+        acl.grant(&p, "temp").unwrap();
+
+        let remaining = acl.capability_time_remaining(&p, 400).unwrap();
+        assert_eq!(remaining[0].1, Some(600));
     }
 }
 

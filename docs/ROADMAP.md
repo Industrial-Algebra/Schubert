@@ -1,6 +1,11 @@
 # Schubert — Directions
 
-**Version:** 0.1.0 — Foundation complete. IA-conformant. Licensed.
+> **v0.3.0 Snapshot** — All 14 core roadmap items complete. Karpal/Minuet
+> upgraded to Apache-2.0. Formal mapping substantiated via distributed game
+> sync design. 14 Proserpina critique findings addressed.
+> See [CHANGELOG.md](../CHANGELOG.md) for version history.
+
+**Version:** 0.3.0 — Clean AGPL break. Formal foundation. Apache-2.0 throughout.
 **Gitflow:** `main` (releases) ← `develop` (integration) ← `feature/*` (work)
 
 ---
@@ -22,7 +27,7 @@ optional `karpal-proof`, `karpal-verify`, `serde`, `rayon`, `toml`).
 - ✅ Multi-Grassmannian controllers (cross-domain access)
 - ✅ Proof-carrying capabilities (Ed25519 cryptographic tokens)
 - ✅ Constitutional verification (Karpal 0.5.0 integration)
-- ✅ AGPL-3.0 dual-licensing
+- ✅ Apache-2.0 dual-licensing
 
 ---
 
@@ -122,41 +127,61 @@ duplicate label rejection).
 **Verified:** 6 tests (issue+verify, wrong key, tampered capability,
 tampered principal, verify_and_extract, batch issuance).
 
-### 8. Temporal Access Control
+### 8. Temporal Access Control — ✅ DONE (v0.1.0)
 
-**Current:** Capabilities are permanent until revoked.
+**Implemented:** Timed capabilities with automatic expiry:
+- `Capability::expires_at` — optional Unix timestamp expiry
+- `Capability::with_expiry()` — builder pattern for timed capabilities
+- `Capability::is_expired_at()` / `time_remaining_at()` — expiry queries
+- `AccessController::check_temporal()` — access checks with expiry awareness
+- `expired_capabilities()` / `capability_time_remaining()` — temporal queries
+- `temporal_trust_level()` — linear trust decay from grant to expiry
 
-**Direction:** Timed capabilities with automatic expiry. The stability engine naturally models this — a capability with expiry time T has a trust level that decays to zero at T, crossing walls at predictable intervals. The phase diagram becomes a calendar.
+**Verified:** 6 tests (expired denied, no-expiry always allowed, mixed expiry,
+expired listing, trust decay, time remaining).
 
-### 9. Quantitative Rate Limiting
+### 9. Quantitative Rate Limiting — ✅ DONE (v0.1.0)
 
-**Current:** Access is binary-geometric. No notion of rate.
+**Implemented:** Token-bucket rate limiting scaled by Schubert intersection numbers:
+- `RateLimiter` — per-principal token buckets with capacity = intersection_number × multiplier × base_rate
+- `configure_principal()` / `configure_from_decision()` — setup from access results
+- `try_consume()` / `can_consume()` — token consumption with refill
+- `tokens_available()` / `capacity()` — bucket state queries
+- Linear refill: tokens replenish at configured rate over time
 
-**Direction:** Blend Schubert intersection with token-bucket rate limiting. The intersection number determines the bucket capacity — access with 2 configurations gets 2× the rate of access with 1. The geometry of access maps to the geometry of throughput.
+**Verified:** 7 tests (consume, exhaust, higher-intersection-gets-more,
+configure from Granted/Denied, can_consume, remove principal).
 
 ---
 
 ## Far-Term (Speculative)
 
-### 10. Schubert Routing
+### 10. Schubert Routing — ✅ DONE (v0.1.0)
 
-Access decisions as routing rules. A network where route advertisement = capability grants and forwarding = Schubert intersection. The number of valid routes between source and destination is the intersection number. Congestion is codimension excess. This is the networking model explored in the ShaperOS transport layer, extracted as a standalone protocol.
+**Implemented:** Geometric network routing via Schubert calculus:
+- `RouteTable` — manages route advertisements as Schubert conditions
+- `RouteAdvertisement` — partition + hop count per node
+- `check_route()` / `check_path()` — single-hop and multi-hop path computation
+- `congestion_level()` — codimension/dimension ratio for congestion detection
+- Intersection number = valid route count
 
-### 11. Surreal Trust Levels
+**Verified:** 7 tests (single hop, congested, impossible, multi-hop,
+congestion level, missing node, node listing).
 
-Amari 0.23.0 provides `RationalSurreal` — exact rational surreal numbers
-with infinitesimal support via `EpsilonPolynomial` (`amari-surreal` with
-`experimental-epsilon` feature). Trust levels become surreal-valued:
+### 11. Surreal Trust Levels — ✅ DONE (v0.1.0)
 
-| Layer | Example | Meaning |
-|-------|---------|--------|
-| Finite real | `0.5` | Standard trust |
-| General rational | `3/7` | Exact, no floating-point artifacts |
-| Infinitesimal | `ε`, `ε²` | Distinct levels within the infinitesimal |
-| Mixed | `0.5 + ε` | Half trust plus a shred |
+**Implemented:** Full surreal trust via Amari 0.23.0:
+- `RationalSurreal` — exact rational trust (1/2, 3/7, etc.)
+- `EpsilonPolynomial` — infinitesimal trust (ε, ε², 5ε)
+- `SurrealTrust::epsilon()` / `epsilon_power(n)` — infinitesimal hierarchy
+- Exact ordering: ε > ε² > 0, 0.5+ε > 0.5
+- `from_f64()` / `approximate()` for backward compatibility
+- `has_infinitesimal()` / `is_purely_finite()` detection
 
-The wall-crossing engine generalizes naturally — the phase φ(t) formula
-is analytic in t. See `docs/surreal-trust-levels.md` for the full expansion.
+**Verified:** 8 tests (full/none, rational ordering, epsilon positive,
+epsilon hierarchy, mixed trust, roundtrip, conversion, detection).
+See `docs/surreal-trust-levels.md` for the expansion (rational/infinitesimal
+layers, the analytic φ(t) generalization).
 
 ### 12. Constitutional Verification — ✅ IMPLEMENTED (v0.1.0)
 
@@ -166,9 +191,179 @@ Integrated with Karpal 0.5.0 verification infrastructure:
 - SMT-LIB2 and Lean 4 export support
 - CI: `.github/workflows/schubert-verify.yml`
 
-### 13. Distributed Access Control with CRDTs
+### 13. Distributed Access Control with CRDTs — ✅ DONE (v0.1.0)
 
-Operadic composition over a distributed system using conflict-free replicated data types. Principals hold vector clocks. Capability grants merge via geometric CRDT operations. The intersection number is computed from eventually-consistent state. This requires the Cliffy protocols geometric CRDT layer.
+**Implemented:** Eventually-consistent capability grants via CRDTs:
+- `CrdtState` — mergeable access control state with version vectors
+- `VersionVector` — happens-before comparison, merge (pointwise max)
+- `CrdtGrant` — last-write-wins grant with version tracking
+- `merge()` — commutative, associative, idempotent state merge
+- `check()` — access computation from eventually-consistent state
+
+**Verified:** 8 tests (happens-before, concurrent, grant/hold, revoke,
+merge-preserves, last-write-wins, idempotent, crdt-access-check).
+
+### 14. Access Control for Holographic Memory — ✅ DONE (v0.1.0)
+
+Integration with Minuet-style holographic memory systems (Minuet 0.3.0,
+Apache-2.0 licensed). Capabilities are binding vectors in a holographic
+reduced representation. Access is granted when the query vector's
+similarity to the capability vector exceeds the trust threshold.
+The wall-crossing engine determines which memories are accessible at
+each trust level.
+
+---
+
+## Near-Term (v0.4.0)
+
+### 15. schubert-tsukoshi — Pure TypeScript Access Control
+
+**Goal:** Extract Schubert's core access control model into a zero-dependency
+TypeScript package, following the cliffy-tsukoshi pattern.
+
+**Architecture:**
+- **LR coefficient tables** — precomputed lookup tables for Gr(2,4), Gr(3,6),
+  Gr(4,8). No amari-enumerative, no Rust, no WASM. Pure TS table lookups are
+  faster than WASM for these small Grassmannians.
+- **AccessController** — capability registry, principals, grant/revoke, check()
+- **Impossibility detection** — the killer feature, via LR table returning 0
+- **CRDT grants** — wraps cliffy-tsukoshi's VectorClock + GeometricCRDT for
+  distributed access state
+- **Universal deployment** — browser, Node.js, React Native, Deno
+
+**What it provides:**
+- Browser-native geometric access control (no backend required)
+- Impossibility detection in JavaScript — the σ₂·σ₁₁ = 0 case works in the browser
+- CRDT-backed distributed access (leveraging cliffy-tsukoshi's protocols)
+- "Smuggle the mathematics" — JS developers call check(), never need to know
+  what a Grassmannian is
+
+**What it doesn't need:**
+- No karpal verification (requires Rust type system)
+- No surreal trust (use `number` for trust in JS)
+- No minuet holographic (no holographic memory in browser)
+
+**Scope:** ~1 week of focused work. Published as `@industrialalgebra/schubert-tsukoshi` on npm (the canonical IA scope; cliffy-tsukoshi and amari-wasm will migrate there during their refactors).
+
+**Reference:** [cliffy-tsukoshi](https://github.com/justinelliottcobb/Cliffy/tree/main/cliffy-tsukoshi) —
+the pattern this follows (pure TS extraction of geometric math from a Rust
+framework, with distributed protocols).
+
+### 16. Consumer-Driven API Polish (from Ijima Integration)
+
+**Motivation:** Ijima — Schubert's first real consumer — revealed integration
+friction points. Each item below eliminates custom boilerplate Ijima had to
+write.
+
+**1. `CapabilityToken::to_bytes()` / `from_bytes()`**
+Ijima reimplemented 80 lines of custom binary wire format (length-prefixed
+fields + base64). Add native serialization to eliminate per-consumer wire
+format code.
+
+**2. `CapabilityIssuer::from_seed()` + `public_key_hex()`**
+Ijima wraps `ed25519_dalek::SigningKey::from_bytes()` and manually hex-encodes
+the public key. Add convenience methods directly on the issuer.
+
+**3. `schubert::axum` module** (feature-gated)
+Ijima wrote its own `AuthPrincipal` Axum extractor (100 lines). Provide built-in
+extractors and middleware so consumers don't reinvent the integration layer.
+
+**4. Multi-capability tokens (grants)**
+Tokens currently carry one capability. Ijima's pi integration needs 4–6
+capabilities simultaneously and currently juggles an env-bundle of one-cap
+tokens. Dominic's federation orchestration has the same pain at scale.
+Full requirements in
+[`handoff-multi-capability-tokens.md`](handoff-multi-capability-tokens.md)
+(PR #29). Design: a `Grant` carries `Vec<CapabilityId>`, signed once,
+verifiable per-capability. Geometrically, a grant is a **subvariety** of
+Gr(k,n) — the union of the granted Schubert varieties — and `may(cap)` asks
+whether the cap's Schubert variety is contained in that subvariety.
+Singleton grants `[cap]` are backward-compatible with today's one-cap tokens.
+**Relationship to #18:** within a single Grassmannian, grant containment is
+set membership (v0.4.0). The flag variety embedding (#18) generalizes this
+to cross-domain grants and upgrades set membership to geometric containment.
+See the analysis below.
+
+**5. Key persistence utilities**
+Ijima wrote 180 lines of file-based key storage (`key_store.rs`) with `0600`
+permissions, path resolution, and load-or-create semantics. Provide a `KeyStore`
+utility or document the recommended pattern.
+
+**6. `check_single()` fast path**
+Ijima bypasses the geometric intersection for per-request checks (uses string
+comparison) because the full `check()` is too heavy for runtime. Provide a
+lightweight single-capability check suitable for high-throughput request paths.
+
+**Scope:** ~2–3 days of focused work. All items are directly validated by
+real consumer usage.
+
+---
+
+## Research Directions (v0.5.0+ and Beyond)
+
+### 17. Compositional Wall-Crossing
+
+**Origin:** The stability-engine rabbit hole (2026-07-06) identified this as
+Schubert's deepest open theoretical question.
+
+**The question:** Does the wall-crossing phase diagram compose under operadic
+gluing? If Principal C = A ∘_S B (composed along shared capability set S), is
+the phase diagram P_C determined by P_A and P_B?
+
+**Why it matters:** In physics, BPS bound states have different wall-crossing
+behavior than their constituents. The Kontsevich-Soibelman (KS) formula
+governs how the spectrum changes when crossing a wall. If Schubert's
+composition satisfies a KS-type formula, then wall-crossing composes — and
+Schubert is not just a geometric access control system but a **category**: 
+principals as objects, compositions as morphisms, wall-crossing as a natural
+transformation from trust levels to stable capability sets.
+
+**Implementation:**
+- Add `analyze_composed_stability()` that takes two principals + shared
+  capabilities and returns the composed phase diagram
+- Compare against individual phase diagrams to test for a KS-type relation
+- If confirmed, this becomes the arXiv preprint's central theoretical result
+
+**Scope:** Research-grade. Requires formal mathematical work alongside
+implementation. Directly informs the publication strategy (Ch. 8 of the
+revised preprint outline).
+
+### 18. Cross-Domain Flag Variety Embedding
+
+**Origin:** Deferred Proserpina critique finding — cross-domain intersection
+derivation needs a flag variety embedding proof.
+
+**The question:** Can capability translation between Grassmannians
+Gr(k₁,n₁) → Gr(k₂,n₂) be formalized as an embedding into a common flag
+variety Fl(k₁, k₂, n)?
+
+**Why it matters:** The `MultiController` currently translates capabilities
+between Grassmannians heuristically. A flag variety embedding would provide
+the formal mathematical foundation — and would close the gap between the
+multi-domain implementation and its theoretical justification.
+
+**Scope:** Paper material. Requires algebraic geometry expertise. Maps to
+Ch. 12 (Future Work) of the arXiv preprint.
+
+**Relationship to #16.4 (multi-cap tokens):** A multi-cap grant on a single
+Grassmannian is a union of Schubert varieties — containment is set membership
+or codimension comparison. But a cross-domain grant (capabilities on both
+Gr(k₁,n) and Gr(k₂,n)) lives naturally on the flag variety Fl(k₁, k₂, n):
+"this principal holds a flag V_{k₁} ⊂ V_{k₂} ⊂ Cⁿ satisfying both domain
+conditions." The flag variety embedding upgrades the v0.4.0 set-membership
+semantics to true geometric containment across domains.
+
+### 19. GPU-Accelerated Schubert Calculus
+
+**Origin:** Borsalino (the IA GPU abstraction layer) provides WGSL kernel
+dispatch for geometric algebra operations.
+
+**The opportunity:** Large Grassmannians (Gr(k,n) with n > 8) require
+computation paths beyond Littlewood-Richardson. Borsalino's GPU substrate
+could accelerate equivariant localization and tropical intersection
+computations, making large-Grassmannian access control practical.
+
+**Scope:** Depends on Borsalino reaching ecosystem adoption. Long-term.
 
 ### 14. Access Control for Holographic Memory
 

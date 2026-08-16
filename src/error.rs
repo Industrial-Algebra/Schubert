@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Industrial Algebra
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 //! Error types for Schubert access control.
 //!
@@ -109,6 +109,17 @@ pub enum SchubertError {
     /// Cryptographic verification failed.
     #[error("crypto verification failed: {0}")]
     CryptoVerificationFailed(String),
+
+    /// Rate limit exceeded for a principal.
+    #[error("rate limit exceeded for principal '{principal}': {available:.2} tokens available out of {capacity:.2}")]
+    RateLimitExceeded {
+        /// The principal that exceeded the rate limit.
+        principal: String,
+        /// Tokens available at time of check.
+        available: f64,
+        /// Maximum token capacity.
+        capacity: f64,
+    },
 }
 
 /// Result type alias for Schubert operations.

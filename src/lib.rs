@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Industrial Algebra
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 //! # Schubert — Quantitative Access Control via Schubert Calculus
 //!
@@ -91,7 +91,9 @@
 //!   Compiles to `wasm32-unknown-unknown` with `--no-default-features`.
 //!   See [`wasm::WasmController`] for the browser API.
 //! - `crypto` — Enables the [`crypto`] module with Ed25519 capability tokens,
-//!   [`crypto::CapabilityIssuer`], and [`crypto::CapabilityVerifier`].
+//!   [`crypto::CapabilityIssuer`], [`crypto::GrantToken`], and [`crypto::GrantVerifier`].
+//! - `axum` — Enables the [`axum`] module with an [`axum::AuthPrincipal`] extractor
+//!   for Bearer-token authentication in Axum web services. Requires `crypto`.
 //!
 //! ## `no_std` Support
 //!
@@ -114,12 +116,21 @@ pub mod capability;
 pub mod composition;
 /// Access controller managing principals, capabilities, and checks.
 pub mod controller;
+/// Distributed access control via CRDTs.
+pub mod crdt;
 /// Cryptographic capability tokens (requires `crypto` feature).
 #[cfg(feature = "crypto")]
 pub mod crypto;
+
+/// Axum integration — extractors and middleware (requires `axum` feature).
+#[cfg(feature = "axum")]
+pub mod axum;
 /// Access decision types — the quantitative result of every check.
 pub mod decision;
 pub mod error;
+/// Holographic memory access control via Minuet (requires `holographic` feature).
+#[cfg(feature = "holographic")]
+pub mod holographic;
 /// Multi-Grassmannian access control.
 pub mod multi;
 /// Compile-time phantom type markers from amari-enumerative.
@@ -131,7 +142,14 @@ pub mod principal;
 /// Proof-carrying access control via Karpal (requires `karpal` feature).
 #[cfg(feature = "karpal")]
 pub mod proof;
+/// Quantitative rate limiting via Schubert intersection numbers.
+pub mod rate_limit;
+/// Geometric network routing via Schubert calculus.
+pub mod routing;
 pub mod stability;
+/// Surreal trust levels (requires `surreal` feature).
+#[cfg(feature = "surreal")]
+pub mod surreal_trust;
 /// Schubert calculus verification via Karpal (future: requires `karpal-verify`).
 #[cfg(feature = "karpal-verify")]
 pub mod verify;
@@ -153,6 +171,7 @@ pub use decision::{AccessContext, AccessDecision, ComputationPath};
 pub use error::{Result, SchubertError};
 pub use multi::MultiController;
 pub use principal::{Principal, PrincipalId};
+pub use rate_limit::RateLimiter;
 pub use stability::{
     analyze_stability, stable_capabilities_at, StabilityBreakpoint, StabilityReport, TrustLevel,
 };

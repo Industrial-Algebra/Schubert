@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Industrial Algebra
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 
 //! Proof-carrying access control via Karpal.
 //!
@@ -398,6 +398,25 @@ pub mod rewrite {
 
     impl Justifies<CheckAB, CheckBA> for ByCheckCommutativity {}
     impl Justifies<CheckBA, CheckAB> for ByCheckCommutativity {}
+}
+
+/// Karpal 0.6.1+ integration: operadic composition verification.
+///
+/// Wraps [`karpal_schubert_types::compose_checks()`]
+/// to provide type-level composability proofs for Schubert access control.
+#[cfg(feature = "karpal-verify")]
+pub mod karpal_compose {
+    use karpal_schubert_types::SchubertTyped;
+
+    /// Verify that three Schubert types compose (A→B→C).
+    ///
+    /// Returns `Some(intersection)` if A is compatible with both B and C
+    /// under Schubert intersection. Returns `None` if any pair is
+    /// geometrically impossible.
+    pub fn verify_triple_composition<A: SchubertTyped, B: SchubertTyped, C: SchubertTyped>(
+    ) -> Option<karpal_schubert_types::Intersection> {
+        karpal_schubert_types::compose_checks::<A, B, C>()
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
