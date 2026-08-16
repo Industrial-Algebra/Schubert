@@ -180,6 +180,8 @@ congestion level, missing node, node listing).
 
 **Verified:** 8 tests (full/none, rational ordering, epsilon positive,
 epsilon hierarchy, mixed trust, roundtrip, conversion, detection).
+See `docs/surreal-trust-levels.md` for the expansion (rational/infinitesimal
+layers, the analytic φ(t) generalization).
 
 ### 12. Constitutional Verification — ✅ IMPLEMENTED (v0.1.0)
 
