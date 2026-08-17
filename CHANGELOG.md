@@ -24,6 +24,19 @@
     sole bearer holder, re-mints): `to_bytes`/`from_bytes` gain trailing
     `nonce(16) | tag(1) | [expires_at u64 BE]`. tsukoshi parity follows.
 
+- **Grant-aware CRDT revocation (#20.2, ADR-0002)** — tombstone registry for
+  *specific issuances*: a grow-only set keyed by the #20.1 nonce, merged by
+  **union**, so a tombstoned grant can never be resurrected by any merge order
+  (the add-wins LWW map could not guarantee that). Renewal = re-issue stays
+  clean — the rotated grant carries a fresh nonce.
+  - Rust: `CrdtState::revoke_grant(nonce, node, ts)` / `is_grant_revoked(nonce)`;
+    blanket `(principal, capability)` `revoke` unchanged.
+  - tsukoshi: `GrantCRDT.revokeGrant(nonceHex)` / `isGrantRevoked(nonceHex)`;
+    snapshots carry the set, and pre-v0.5.0 snapshots deserialize to an empty
+    set (backward-tolerant).
+  - Access predicate now: valid signature AND not expired AND **not
+    tombstoned** AND not blanket-revoked (ADR-0001 rule 5, extended).
+
 
 ## [0.4.0] — 2026-07-19
 

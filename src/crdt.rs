@@ -38,7 +38,7 @@
 //! # Ok::<(), schubert::SchubertError>(())
 //! ```
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     error::{Result, SchubertError},
@@ -138,6 +138,10 @@ pub struct CrdtState {
     /// refuse decisions when the youngest grant is older than this.
     /// `None` disables staleness gating (default).
     max_staleness_ms: Option<u64>,
+    /// Grant tombstones — issuance nonces of specifically-revoked grants
+    /// (#20.2, ADR-0002). Grow-only set; merge is union, so a tombstoned
+    /// issuance can never be resurrected by any merge order.
+    revoked_grants: HashSet<[u8; 16]>,
 }
 
 impl CrdtState {
@@ -156,6 +160,7 @@ impl CrdtState {
             grants: HashMap::new(),
             version: VersionVector::new(),
             max_staleness_ms: None,
+            revoked_grants: HashSet::new(),
         })
     }
 
@@ -235,6 +240,38 @@ impl CrdtState {
         Ok(())
     }
 
+    /// Tombstone one specific grant issuance (#20.2, ADR-0002).
+    ///
+    /// `nonce` is the issuance nonce of a [`GrantToken`](crate::crypto::GrantToken)
+    /// (the 16-byte field covered by its signature): pass `&grant.nonce` from
+    /// the crypto layer. Unlike [`revoke`](Self::revoke) — the blanket
+    /// `(principal, capability)` deprovisioning path — a tombstone kills one
+    /// bearer and **cannot be resurrected by any merge order** (grow-only set,
+    /// union merge). Renewal is unaffected: re-issue produces a fresh nonce
+    /// (ADR-0001 rule 4).
+    ///
+    /// Idempotent; advances the version vector like every state change.
+    pub fn revoke_grant(
+        &mut self,
+        nonce: [u8; 16],
+        node_id: &str,
+        timestamp_ms: u64,
+    ) -> Result<()> {
+        let _ = timestamp_ms; // tombstones are unordered (union merge); kept for signature symmetry
+        self.version.increment(node_id);
+        self.revoked_grants.insert(nonce);
+        Ok(())
+    }
+
+    /// Has this specific grant issuance been tombstoned? (ADR-0002.)
+    ///
+    /// Composes as the third OR-branch of the access predicate (ADR-0001
+    /// rule 5, extended): access = valid signature ∧ not expired ∧
+    /// **not tombstoned** ∧ not blanket-revoked.
+    pub fn is_grant_revoked(&self, nonce: &[u8; 16]) -> bool {
+        self.revoked_grants.contains(nonce)
+    }
+
     /// Check if a principal holds a capability.
     pub fn holds(&self, principal: &PrincipalId, capability: &str) -> bool {
         let cid = CapabilityId::new(capability);
@@ -269,6 +306,11 @@ impl CrdtState {
             self.capabilities
                 .entry(id.clone())
                 .or_insert_with(|| cap.clone());
+        }
+
+        // Merge grant tombstones (union — grow-only set, ADR-0002).
+        for nonce in &other.revoked_grants {
+            self.revoked_grants.insert(*nonce);
         }
     }
 
@@ -443,5 +485,75 @@ mod tests {
             .unwrap();
         // σ₁·σ₂ in Gr(2,4) — underconstrained
         assert!(matches!(result, AccessDecision::Underconstrained { .. }));
+    }
+
+    // --- #20.2: grant-aware revocation (ADR-0002 tombstones) ------------------
+
+    #[test]
+    fn tombstone_revoke_and_query() {
+        let mut state = CrdtState::new(2, 4).unwrap();
+        let nonce = [7u8; 16];
+        state.revoke_grant(nonce, "node-a", 100).unwrap();
+        assert!(state.is_grant_revoked(&nonce));
+        assert!(!state.is_grant_revoked(&[8u8; 16]));
+    }
+
+    #[test]
+    fn tombstones_merge_as_union_both_directions() {
+        let mut a = CrdtState::new(2, 4).unwrap();
+        let mut b = CrdtState::new(2, 4).unwrap();
+        a.revoke_grant([1u8; 16], "node-a", 100).unwrap();
+        b.revoke_grant([2u8; 16], "node-b", 200).unwrap();
+
+        a.merge(&b);
+        b.merge(&a);
+        assert!(a.is_grant_revoked(&[1u8; 16]) && a.is_grant_revoked(&[2u8; 16]));
+        assert!(b.is_grant_revoked(&[1u8; 16]) && b.is_grant_revoked(&[2u8; 16]));
+
+        // Idempotent: merging again changes nothing observable.
+        let a2 = a.clone();
+        a.merge(&a2);
+        assert!(a.is_grant_revoked(&[1u8; 16]) && a.is_grant_revoked(&[2u8; 16]));
+        assert!(a.is_converged_with(b.version()));
+    }
+
+    #[test]
+    fn tombstone_leaves_capability_grants_alone() {
+        let mut state = CrdtState::new(2, 4).unwrap();
+        state
+            .register_capability(Capability::new(
+                "read",
+                "Read",
+                vec![1],
+                CapabilityKind::ReadLike,
+            ))
+            .unwrap();
+        state.grant("alice", "read", "node-a", 100).unwrap();
+        state.revoke_grant([9u8; 16], "node-a", 150).unwrap();
+        // A grant tombstone targets one issuance — the (principal, capability)
+        // grant is untouched.
+        assert!(state.holds(&PrincipalId::new("alice"), "read"));
+    }
+
+    #[test]
+    fn tombstone_reissue_with_fresh_nonce_is_alive() {
+        // Renewal = re-issue (ADR-0001 r4): the rotated grant carries a fresh
+        // nonce, so tombstoning the old issuance never kills the replacement.
+        let mut state = CrdtState::new(2, 4).unwrap();
+        let old_nonce = [0xaa; 16];
+        let new_nonce = [0xbb; 16];
+        state.revoke_grant(old_nonce, "node-a", 100).unwrap();
+        assert!(state.is_grant_revoked(&old_nonce));
+        assert!(!state.is_grant_revoked(&new_nonce));
+    }
+
+    #[test]
+    fn revoke_grant_is_idempotent_and_advances_version() {
+        let mut state = CrdtState::new(2, 4).unwrap();
+        state.revoke_grant([3u8; 16], "node-a", 100).unwrap();
+        let v1 = state.version().get("node-a");
+        state.revoke_grant([3u8; 16], "node-a", 200).unwrap();
+        assert_eq!(state.version().get("node-a"), v1 + 1);
+        assert!(state.is_grant_revoked(&[3u8; 16]));
     }
 }
