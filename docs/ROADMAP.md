@@ -364,6 +364,24 @@ rationale — revocation = incidents, expiry = deprovisioning), Ijima
 `docs/adr/grant-token-migration.md` (consumer context), Schubert
 `docs/handoff-multi-capability-tokens.md` (GrantToken origin).
 
+**Interaction with consumer revocation** (per Anima PULSE 2026-08-17
+rec #5 — the half-page scoping it asked for): Ijima already runs a
+store-backed revocation list checked at verify. The composing rules the
+0.5 design must not leave undefined:
+
+- **Verify order:** consumers check revocation-or-expiry as one rejection
+  step — either answer is "dead", and which one fired is telemetry, not
+  semantics. `verify_at` returning a distinct error class for expiry lets
+  callers distinguish without a second API.
+- **Clock skew:** expiry is a wall-clock comparison; satellites may drift.
+  Recommended: document a skew tolerance (e.g. ±30s leeway on
+  `expires_at_unix` comparisons) or leave skew policy to the caller via
+  the injected clock in `verify_at` — either way, say which.
+- **Renewal = re-issue:** there is no renewal mutation; a rotated grant is
+  a fresh `issue_grant` (new nonce ⇒ distinct bearer), with the old one
+  expiring or being revoked. The nonce (this item) is what makes that
+  clean — document the pattern rather than adding a renewal API.
+
 **Scope:** ~2–4 days including tsukoshi parity.
 
 ---
