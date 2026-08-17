@@ -443,8 +443,9 @@ Wallace/Dominic/Ijima 2026-08 build wave.
 [`docs/design/wall-crossing-diffusion-composition.md`](design/wall-crossing-diffusion-composition.md)
 — the v0.5.0 framing via diffusion-LM composition for Quantizon (BPS
 non-additivity as a candidate formalism for emergence; tropical bridge). A
-KS-type composition probe (`analyze_composed_stability`) is in flight
-(PR #37, CI-green).
+KS-type composition probe (`analyze_composed_stability`) **landed in v0.5.0
+development** (PR #37, merged: computes `P_A`/`P_B`/`P_C` and tests additivity
+— see the [v0.5.0 sprint plan](plans/2026-08-17-v0.5.0-sprint-plan.md)).
 
 **Origin:** The stability-engine rabbit hole (2026-07-06) identified this as
 Schubert's deepest open theoretical question.
