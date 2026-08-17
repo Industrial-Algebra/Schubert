@@ -321,7 +321,7 @@ real consumer usage.
 
 ## Near-Term (v0.5.0) — Grant Lifecycle (consumer-driven)
 
-### 20. Grant Lifecycle — expiry, revocation, policy-issuance linkage
+### 20. Grant Lifecycle — expiry & nonce, grant-aware revocation, policy-issuance linkage
 
 **Origin:** The 0.4.0 consumer wave (Ijima → Dominic) shipped grants, but
 three lifecycle gaps are now pressing for the next consumers: **Wallace
@@ -329,11 +329,89 @@ extensions** (capability-gated extension packages), **Dominic federation**
 (peer grants across instances), and **Ijima** (peer grants + the deferred
 `capability_policy_ref`). Each item below is verified against the 0.4.0 code.
 
-**1. `GrantToken` expiry**
-`GrantToken` (crypto.rs) has no expiry; temporal expiry exists only on the
-controller-path `Capability` (#8). Wallace wants session-scoped extension
-grants ("dies with the session"); Dominic wants time-boxed federation
-grants. Port `expires_at` + `with_expiry` + expiry-aware `verify` to grants.
+**1. `GrantToken` expiry & nonce (Ijima-driven — full spec below)**
+
+**Motivation (field friction, from the first real consumer):** Ijima
+v0.2.0 hardened its deployment path and hit two `GrantToken` gaps that
+policy-layer features cannot cover:
+
+1. **No token-carried expiry.** A bearer is valid until the issuer key
+dies. Ijima built a store-backed revocation list for *incidents*
+(kill a leaked token now — `docs/adr/token-revocation.md` in the Ijima
+repo), but *routine* deprovisioning (service-feed rotation, principal
+offboarding) wants TTLs the **verifier can check standalone** — critical
+for the v0.3 federation shape, where satellite instances verify grants
+without phoning home to a controller.
+2. **No nonce/jti.** `issue_grant` signs `(principal, capabilities,
+issuer_key)` — so re-issuing the same grant from the same seed yields a
+**byte-identical bearer**. A revoked token therefore cannot be cleanly
+re-issued: the revocation hash kills the re-issue too. A random nonce
+makes every issuance distinct.
+
+**Relationship to existing work:** the policy layer already has temporal
+access control (`Capability::expires_at`, `check_temporal()`, trust
+decay — item #8), but that requires the `AccessController` at check
+time. This item is the **crypto layer**: standalone, proof-carrying,
+verifier-side only.
+
+**Spec sketch:**
+
+- `GrantToken` gains `expires_at_unix: Option<u64>` (None = never) and
+  `nonce: [u8; 16]` (random at issue).
+- Both fields are covered by the signature: extend the canonical signing
+  message in `issue_grant` and `GrantVerifier::verify` identically.
+- The nonce is **not** part of the canonical capability sort — sort stays
+  `(partition, id)`; distinctness comes from the signed nonce alone.
+- Wire format: extend `GrantToken::to_bytes`/`from_bytes`. Breaking change
+to the blob layout is acceptable in a 0.x minor (Ijima re-mints; no
+external bearers exist beyond it).
+- `GrantVerifier::verify_at(grant, now_unix)` — deterministic,
+clock-injected variant — with `verify(grant)` delegating via
+`SystemTime::now()`. Expired ⇒ the same error class as a bad signature.
+- Issuer surface: `issue_grant` defaults `nonce = random`,
+  `expires_at = None`; add `issue_grant_with_expiry(principal, caps,
+  expires_at)` (and/or a builder) for explicit control. Deterministic
+  issuance for tests: allow injecting the nonce.
+- **tsukoshi parity:** mirror in
+  `@industrialalgebra/schubert-tsukoshi` (crypto subpath), including the
+  cross-language fixture test (Rust-issued ⇒ TS-verified, both expiry and
+  nonce paths).
+
+**Tests:**
+
+- Round trip: future expiry verifies, past expiry rejected,
+  `verify_at` determinism (same grant, injected clocks).
+- Distinctness: two `issue_grant` calls with identical inputs produce
+  different bytes, both verify (nonce works).
+- Tamper: flipping expiry or nonce bytes ⇒ signature failure.
+- Sort stability: capability ordering unchanged by nonce randomness.
+- Cross-language fixture (tsukoshi).
+
+**References:** Ijima `docs/adr/token-revocation.md` (complementary
+rationale — revocation = incidents, expiry = deprovisioning), Ijima
+`docs/adr/grant-token-migration.md` (consumer context), Schubert
+`docs/handoff-multi-capability-tokens.md` (GrantToken origin).
+
+**Interaction with consumer revocation** (per Anima PULSE 2026-08-17
+rec #5 — the half-page scoping it asked for): Ijima already runs a
+store-backed revocation list checked at verify. The composing rules the
+0.5 design must not leave undefined:
+
+- **Verify order:** consumers check revocation-or-expiry as one rejection
+  step — either answer is "dead", and which one fired is telemetry, not
+  semantics. `verify_at` returning a distinct error class for expiry lets
+  callers distinguish without a second API.
+- **Clock skew:** expiry is a wall-clock comparison; satellites may drift.
+  Recommended: document a skew tolerance (e.g. ±30s leeway on
+  `expires_at_unix` comparisons) or leave skew policy to the caller via
+  the injected clock in `verify_at` — either way, say which.
+- **Renewal = re-issue:** there is no renewal mutation; a rotated grant is
+  a fresh `issue_grant` (new nonce ⇒ distinct bearer), with the old one
+  expiring or being revoked. The nonce (this item) is what makes that
+  clean — document the pattern rather than adding a renewal API.
+
+**Scope:** ~2–4 days including tsukoshi parity.
+
 
 **2. Grant-aware CRDT revocation**
 `CrdtGrant` (crdt.rs) tracks a single `CapabilityId` — pre-`GrantToken`
@@ -350,8 +428,9 @@ drives *what grants may be issued* (constrained issuance), so Ijima can own
 policy while principals carry grants — the capability-driven control-API
 design (Dominic ROADMAP §3.5 anticipates this).
 
-**Scope:** ~1 week. Same character as #16 — each item eliminates boilerplate
-a consumer has written or is about to write. Directly validated by the
+**Scope:** item 1 ~2–4 days (incl. tsukoshi parity, spec above); items 2–3 add
+~1 week. Same character as #16 — each item eliminates boilerplate a consumer
+has written or is about to write. Directly validated by the
 Wallace/Dominic/Ijima 2026-08 build wave.
 
 ---
