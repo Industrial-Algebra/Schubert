@@ -110,6 +110,18 @@ pub enum SchubertError {
     #[error("crypto verification failed: {0}")]
     CryptoVerificationFailed(String),
 
+    /// A grant token's expiry has passed (Roadmap #20.1, ADR-0001).
+    ///
+    /// Distinct from a signature failure so callers can tell a dead grant
+    /// from a forged one without a second API surface.
+    #[error("grant expired: expires_at {expires_at}, now {now}")]
+    GrantExpired {
+        /// The grant's signed expiry instant (Unix seconds).
+        expires_at: u64,
+        /// The verification instant that killed it (Unix seconds).
+        now: u64,
+    },
+
     /// Rate limit exceeded for a principal.
     #[error("rate limit exceeded for principal '{principal}': {available:.2} tokens available out of {capacity:.2}")]
     RateLimitExceeded {

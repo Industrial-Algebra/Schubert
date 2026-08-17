@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.5.0] — Unreleased
+
+### Added
+
+- **`GrantToken` expiry & nonce (#20.1, ADR-0001)** — token-carried grant
+  lifecycle, verifier-checked standalone (no controller round-trip — what
+  federation satellites need):
+  - `expires_at: Option<u64>` (Unix seconds, **covered by the signature**;
+    `None` = never, the pre-0.5.0 behavior). A grant is dead the instant
+    `now >= expires_at` (inclusive boundary).
+  - `nonce: [u8; 16]` — random at issue, signed, **not** part of the canonical
+    capability sort. Makes every issuance distinct, so a revoked grant can be
+    cleanly re-issued from the same seed (renewal = re-issue, ADR-0001 rule 4).
+  - `GrantVerifier::verify_at(grant, now_unix)` — deterministic, clock-injected;
+    `verify(grant)` delegates via `SystemTime::now()`. Verification order:
+    signature, then expiry. New [`SchubertError::GrantExpired`] distinguishes a
+    dead grant from a forged one.
+  - Issuer surface: `issue_grant` (defaults), `issue_grant_with_expiry`,
+    `issue_grant_with_options(GrantOptions)` with injectable nonce for
+    deterministic tests.
+  - **Breaking wire-format change** (ADR-0001: acceptable in 0.x — Ijima, the
+    sole bearer holder, re-mints): `to_bytes`/`from_bytes` gain trailing
+    `nonce(16) | tag(1) | [expires_at u64 BE]`. tsukoshi parity follows.
+
+
 ## [0.4.0] — 2026-07-19
 
 ### Added
