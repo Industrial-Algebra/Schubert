@@ -29,6 +29,20 @@ export function writeU8(buf: number[], value: number): void {
   buf.push(value & 0xff);
 }
 
+/** Write a big-endian u64 (must be a non-negative safe integer). */
+export function writeU64BE(buf: number[], value: number): void {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error("schubert-tsukoshi: u64 must be a non-negative safe integer");
+  }
+  let v = value;
+  const bytes: number[] = [];
+  for (let i = 0; i < 8; i++) {
+    bytes.unshift(v % 256);
+    v = Math.floor(v / 256);
+  }
+  buf.push(...bytes);
+}
+
 /** Cursor-based reader over a byte array. */
 export class Reader {
   private pos = 0;
@@ -45,6 +59,18 @@ export class Reader {
     this.ensure(1);
     const v = this.data[this.pos];
     this.pos += 1;
+    return v;
+  }
+
+  /** Read a big-endian u64 as a number (must stay a safe integer). */
+  u64(): number {
+    this.ensure(8);
+    let v = 0;
+    for (let i = 0; i < 8; i++) v = v * 256 + this.data[this.pos + i];
+    this.pos += 8;
+    if (!Number.isSafeInteger(v)) {
+      throw new Error("schubert-tsukoshi: u64 exceeds safe integer range");
+    }
     return v;
   }
 
