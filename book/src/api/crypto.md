@@ -98,10 +98,57 @@ capability_len | capability | 32B issuer key | 64B signature`.
 
 **`GrantToken`** layout: `u16 BE principal_len | principal | u16 BE cap_count |
 per cap: u16 BE id_len | id | u8 partition_len | partition bytes | 32B issuer
-key | 64B signature`.
+key | 64B signature | 16B nonce | u8 expiry tag | [8B u64 BE expires_at]`.
+The tag is `1` iff an expiry is present (then the 8-byte field follows), `0`
+iff the grant never expires. The trailing fields are new in v0.5.0 — a
+**breaking** layout change (the sole bearer holder re-mints on upgrade).
 
 > The TypeScript extraction (`schubert-tsukoshi`) uses this exact wire format —
-> tokens issued in Rust verify in TS and vice-versa.
+> tokens issued in Rust verify in TS and vice-versa (cross-language fixtures
+> pin both the expiry and nonce paths).
+
+## Grant Expiry & Nonce (v0.5.0)
+
+Grants carry their own lifecycle, checked by the verifier **standalone** — no
+controller round-trip, which is what federation satellites need (ADR-0001):
+
+- **`expires_at: Option<u64>`** — Unix seconds, covered by the signature.
+  `None` = never (the pre-0.5.0 behavior). A grant is dead the instant
+  `now >= expires_at` — the boundary is inclusive.
+- **`nonce: [u8; 16]`** — random at issue, signed, never part of the canonical
+  capability sort. Every issuance is distinct, so a **revoked grant can be
+  cleanly re-issued** from the same seed: renewal = re-issue, not mutation.
+
+```rust
+use schubert::crypto::{CapabilityIssuer, GrantOptions, GrantVerifier};
+
+let issuer = CapabilityIssuer::from_seed(seed);
+
+// Default: random nonce, no expiry.
+let rolling = issuer.issue_grant("alice", &[(cap_read(), vec![1])])?;
+
+// Time-boxed grant — dies at the boundary, verifier-checked.
+let session = issuer.issue_grant_with_expiry(
+    "alice", &[(cap_read(), vec![1])], 2_000_000_000)?;
+
+// Explicit control (deterministic nonce for tests / reproducible issuance).
+let pinned = issuer.issue_grant_with_options(
+    "alice", &[(cap_read(), vec![1])],
+    GrantOptions { expires_at: None, nonce: [9u8; 16] })?;
+
+let verifier = GrantVerifier::new(issuer.public_key());
+verifier.verify_at(&session, 1_999_999_999)?;   // Ok — strictly before
+// verifier.verify_at(&session, 2_000_000_000)  // Err(GrantExpired) — at = dead
+```
+
+Verification order is **signature, then expiry** — a tampered expiry reads as
+a signature failure. [`SchubertError::GrantExpired`][1] carries
+`{ expires_at, now }` so callers can distinguish a dead grant from a forged
+one. Caller-side revocation composes afterward as an OR (access = valid
+signature AND not expired AND not revoked); clock-skew tolerance is the
+verifier's concern, not the token's.
+
+[1]: https://docs.rs/schubert/latest/schubert/enum.SchubertError.html
 
 ## Key Persistence (`KeyStore`)
 
@@ -135,6 +182,8 @@ pub struct CapabilityToken {
 pub struct GrantToken {
     pub principal: PrincipalId,
     pub capabilities: Vec<GrantCapability>,
+    pub nonce: [u8; 16],        // signed issuance nonce (v0.5.0)
+    pub expires_at: Option<u64>, // signed Unix-seconds expiry (v0.5.0)
     pub issuer_key: Vec<u8>,
     pub signature: Vec<u8>,
 }
