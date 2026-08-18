@@ -420,6 +420,10 @@ session participants; Ijima needs peer revocation; Dominic needs peer
 revocation converging across federation state. Either upgrade `CrdtGrant` to
 carry a grant id, or add revocation registries (tombstones) keyed by grant
 hash. `GrantCRDT` (tsukoshi) will need the parallel treatment.
+**Resolved: [ADR-0002](adr/0002-grant-crdt-revocation.md) — tombstone registry
+(grow-only set, union merge) keyed by the #20.1 issuance nonce; implemented in
+v0.5.0 (Rust `revoke_grant`/`is_grant_revoked`, tsukoshi
+`revokeGrant`/`isGrantRevoked`).**
 
 **3. Policy → issuance linkage**
 The controller path has `from_policy_toml` (#3); grants have

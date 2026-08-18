@@ -70,6 +70,7 @@ export class GrantCRDT {
     private readonly nodeId: string,
     clock?: VectorClock,
     private readonly entries: Map<string, GrantEntry> = new Map(),
+    private readonly revokedGrants: Set<string> = new Set(),
   ) {
     this.clock = clock ?? new VectorClock();
   }
@@ -103,6 +104,24 @@ export class GrantCRDT {
       clock: this.clock.clone(),
       nodeId: this.nodeId,
     });
+  }
+
+  /**
+   * Tombstone one specific grant issuance (#20.2, ADR-0002) — keyed by the
+   * hex-encoded 16-byte issuance nonce of a `GrantToken` (the crypto
+   * subpath's `toHex(grant.nonce)`). Unlike `revoke` (blanket per
+   * (principal, capability)), a tombstone kills one bearer and **cannot be
+   * resurrected by any merge order** (grow-only set, union merge). Renewal =
+   * re-issue is unaffected: the rotated grant carries a fresh nonce.
+   */
+  revokeGrant(nonceHex: string): void {
+    this.clock.tick(this.nodeId);
+    this.revokedGrants.add(nonceHex);
+  }
+
+  /** Has this specific issuance been tombstoned? (ADR-0002.) */
+  isGrantRevoked(nonceHex: string): boolean {
+    return this.revokedGrants.has(nonceHex);
   }
 
   /**
@@ -156,6 +175,7 @@ export class GrantCRDT {
       }
     }
     this.clock.update(other.clock);
+    for (const n of other.revokedGrants) this.revokedGrants.add(n);
   }
 
   /**
@@ -180,6 +200,7 @@ export class GrantCRDT {
       nodeId: this.nodeId,
       clock: this.clock.toJSON(),
       entries,
+      revokedGrants: [...this.revokedGrants],
     };
   }
 
@@ -201,7 +222,9 @@ export class GrantCRDT {
         nodeId: e.nodeId,
       });
     }
-    return new GrantCRDT(nodeId ?? data.nodeId, clock, entries);
+    // Tombstones (#20.2): absent in pre-ADR-0002 snapshots — treat as empty.
+    const revokedGrants = new Set<string>(data.revokedGrants ?? []);
+    return new GrantCRDT(nodeId ?? data.nodeId, clock, entries, revokedGrants);
   }
 
   /** Defensive copy of this replica's clock (for inspection/testing). */
@@ -234,6 +257,8 @@ export interface SerializedGrantCRDT {
   readonly nodeId: string;
   readonly clock: Record<string, number>;
   readonly entries: readonly SerializedEntry[];
+  /** Tombstoned issuance nonces (hex), #20.2 — absent in legacy snapshots. */
+  readonly revokedGrants?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
