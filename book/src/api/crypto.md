@@ -5,7 +5,7 @@ feature:
 
 ```toml
 [dependencies]
-schubert = { version = "0.4", features = ["crypto"] }
+schubert = { version = "0.5", features = ["crypto"] }
 ```
 
 Schubert ships two token kinds, both Ed25519-signed:

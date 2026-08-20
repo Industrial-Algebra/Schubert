@@ -4,7 +4,7 @@
 
 ```toml
 [dependencies]
-schubert = "0.1"
+schubert = "0.5"
 ```
 
 ## Feature Flags

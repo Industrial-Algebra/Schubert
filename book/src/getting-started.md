@@ -6,7 +6,7 @@ Add Schubert to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-schubert = "0.1"
+schubert = "0.5"
 ```
 
 Schubert requires **nightly Rust** (the Industrial Algebra ecosystem standard):
