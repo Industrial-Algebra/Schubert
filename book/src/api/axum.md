@@ -6,7 +6,7 @@ enables `crypto`):
 
 ```toml
 [dependencies]
-schubert = { version = "0.4", features = ["axum"] }
+schubert = { version = "0.5", features = ["axum"] }
 ```
 
 The [`AuthPrincipal`](#the-authprincipal-extractor) extractor validates a
