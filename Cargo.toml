@@ -88,6 +88,10 @@ path = "examples/tsukoshi_crypto_vectors.rs"
 required-features = ["crypto"]
 
 
+[[example]]
+name = "wall_crossing_probe"
+path = "examples/wall_crossing_probe.rs"
+
 [[bench]]
 name = "computation_paths"
 harness = false

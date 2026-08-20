@@ -446,6 +446,12 @@ Wallace/Dominic/Ijima 2026-08 build wave.
 
 ### 17. Compositional Wall-Crossing
 
+**v0.5.0 instrumentation:** `analyze_composed_stability` (probe; landed) + the
+`wall_crossing_probe` example (sweep). Measured baseline under the current
+engine: **additive** — walls are per-capability, and overlapping retained
+capabilities are deduplicated in the baseline (union semantics). An
+interaction-aware engine is what would produce genuine non-additivity.
+
 **Expanded:** see
 [`docs/design/wall-crossing-diffusion-composition.md`](design/wall-crossing-diffusion-composition.md)
 — the v0.5.0 framing via diffusion-LM composition for Quantizon (BPS

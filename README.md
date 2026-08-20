@@ -222,7 +222,7 @@ cargo run --example rate_limiter      # Intersection-number rate limiting
   - **Grant tombstones** — unresurrectable revocation of specific issuances via grow-only nonce-keyed set, union-merged across replicas (ADR-0002)
   - **Policy-constrained issuance** — `GrantPolicy`/`issue_grant_under_policy`: policy.toml gates *what grants may be issued*, exact `(id, partition)` match, fails closed (#20.3)
   - **tsukoshi parity** — expiry, nonce, and tombstones mirrored in TypeScript with bidirectional cross-language fixtures
-- **#17 instrument** — `analyze_composed_stability()`: computes `P_A`/`P_B`/`P_C` and tests the KS-type additivity question empirically
+- **#17 instrument** — `analyze_composed_stability()`: computes `P_A`/`P_B`/`P_C` and tests the KS-type additivity question empirically — with the `wall_crossing_probe` example sweeping composition families (and the probe's own overlap-dedup fix: shared retained capabilities count once in the baseline)
 
 ### v0.4.0
 - **`schubert::axum` module** — bearer-token `AuthPrincipal` extractor (401 vs 500 split)

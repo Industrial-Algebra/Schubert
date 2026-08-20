@@ -51,3 +51,29 @@ pub struct StabilityWall {
 let principals = vec![alice, bob, carol];
 let reports = analyze_stability_batch(&acl, &principals)?;
 ```
+
+## Composed Stability (v0.5.0)
+
+`analyze_composed_stability` probes Roadmap #17's open question — *does the
+composed phase diagram `P_C` derive from `P_A` and `P_B`?* — empirically. For
+an operadic composition `A ∘_S B` (see [`composition`](./composition.md)), it
+computes all three diagrams and tests `P_C` against the **deduplicated
+additive baseline**: the stable-count of the *union* of the constituents'
+retained capabilities. Where the baseline holds (`is_additive`), composition
+is predictable; where it deviates, the deviating trust levels
+(`non_additive_breakpoints`) are emergence signatures — the BPS-bound-state
+analogy.
+
+```rust
+use schubert::stability::analyze_composed_stability;
+
+let report = analyze_composed_stability(&acl, &alice, "handoff", &bob, "handoff")?;
+assert!(report.is_additive); // under the current engine — the measured baseline
+```
+
+Under the current `WallCrossingEngine` the measured result is **additive** —
+walls are per-capability — which this instrument establishes as the baseline
+any interaction-aware engine must beat. Run
+`cargo run --example wall_crossing_probe` to sweep a family of compositions
+and see the verdicts; the docs (`docs/design/wall-crossing-diffusion-composition.md`)
+frame the research direction this instrument serves.

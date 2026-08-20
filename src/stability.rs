@@ -349,11 +349,27 @@ pub fn analyze_composed_stability(
 
     // KS-type additivity test: at each sampled trust level, does the composed
     // stable-count equal the sum of the retained constituents' stable-counts?
+    //
+    // Overlapping capabilities are held ONCE by C (union semantics), so the
+    // additive baseline must deduplicate: predict over the union of retained
+    // capability ids, counting each once. Without this, a capability held by
+    // both constituents (A's output is B's input; distinct shared caps) would
+    // be double-counted and every overlapping composition would falsely read
+    // as 'emergent'.
+    let retained_union: std::collections::BTreeSet<String> = a_retained
+        .capabilities
+        .iter()
+        .map(|c| c.id.to_string())
+        .chain(b_retained.capabilities.iter().map(|c| c.id.to_string()))
+        .collect();
+    let union_ns = merge_namespaces(&a_retained, &b_retained)?;
+    debug_assert_eq!(union_ns.capabilities.len(), retained_union.len());
+
     let mut deviating: Vec<f64> = diagram_c
         .iter()
         .filter(|(trust, composed_count)| {
             let cond = StabilityCondition::standard(grassmannian, *trust);
-            let predicted = cond.stable_count(&a_retained) + cond.stable_count(&b_retained);
+            let predicted = cond.stable_count(&union_ns);
             predicted != *composed_count
         })
         .map(|(trust, _)| *trust)
@@ -501,5 +517,31 @@ mod tests {
 
         let err = analyze_composed_stability(&acl, &alice, "handoff", &bob, "handoff");
         assert!(err.is_err());
+    }
+
+    #[test]
+    fn overlapping_retained_capabilities_are_not_double_counted() {
+        // Found by the wall_crossing_probe example: when a capability is
+        // retained by BOTH constituents (here: both hold "audit", and the
+        // interface consumes handoff/sign), C holds it once (union), so the
+        // additive baseline must deduplicate too — otherwise every overlap
+        // reads as false emergence.
+        let mut acl = seeded_acl();
+        let alice = acl.create_principal("alice").unwrap();
+        let bob = acl.create_principal("bob").unwrap();
+        // A: handoff (output) + audit; B: handoff (input) + audit + sign.
+        acl.grant(&alice, "handoff").unwrap();
+        acl.grant(&alice, "audit").unwrap();
+        acl.grant(&bob, "handoff").unwrap();
+        acl.grant(&bob, "audit").unwrap();
+        acl.grant(&bob, "sign").unwrap();
+
+        let report = analyze_composed_stability(&acl, &alice, "handoff", &bob, "handoff").unwrap();
+
+        // C = union(audit, {audit, sign}) = {audit, sign} — audit counted once.
+        assert_eq!(report.phase_diagram_composed.total_capabilities, 2);
+        // The deduplicated baseline matches exactly: no false emergence.
+        assert!(report.is_additive, "overlap must not read as emergence");
+        assert!(report.non_additive_breakpoints.is_empty());
     }
 }
