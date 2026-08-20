@@ -6,7 +6,7 @@ enables `crypto`):
 
 ```toml
 [dependencies]
-schubert = { version = "0.4", features = ["axum"] }
+schubert = { version = "0.5", features = ["axum"] }
 ```
 
 The [`AuthPrincipal`](#the-authprincipal-extractor) extractor validates a
@@ -108,3 +108,22 @@ Authorization: Bearer <base64(GrantToken::to_bytes(grant))>
 The extractor decodes, parses, and verifies in one step; the handler receives a
 ready-to-use `AuthPrincipal`. See [`crypto`](./crypto.md) for issuing grants,
 key persistence (`KeyStore`), and the geometric-containment `may()` check.
+
+### Expiry is enforced by the extractor (v0.5.0)
+
+The extractor calls `GrantVerifier::verify`, which checks the signed
+`expires_at` against the wall clock — **an expired grant is a 401**, the same
+client-failure class as a bad signature, with no extra wiring. Issue
+session-scoped or time-boxed grants with
+[`issue_grant_with_expiry`](./crypto.md#grant-expiry--nonce-v050):
+
+```rust
+// Session grant: dies at the boundary — extractor rejects it as 401 after.
+let session = issuer.issue_grant_with_expiry(
+    "alice", &[(cap_id, partition)], session_end_unix)?;
+```
+
+There is no renewal mutation: rotation is re-issue (the issuance nonce makes
+the fresh bearer distinct from the old one even from the same seed). Routine
+deprovisioning uses expiry; incident response stays with the consumer-side
+revocation list (ADR-0001: they compose as OR).

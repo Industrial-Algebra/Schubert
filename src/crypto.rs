@@ -37,6 +37,7 @@ use ed25519_dalek::{
     Signature, Signer, SigningKey, VerifyingKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
 };
 use rand::rngs::OsRng;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const ISSUER_KEY_LEN: usize = PUBLIC_KEY_LENGTH;
 const SIG_LEN: usize = SIGNATURE_LENGTH;
@@ -215,10 +216,46 @@ impl CapabilityIssuer {
     ///
     /// Capabilities are canonically sorted by partition (component-wise)
     /// before signing, so order-independent grants produce the same signature.
+    /// Issue a multi-capability grant with default options.
+    ///
+    /// Defaults (#20.1): a random 16-byte nonce — every issuance is distinct —
+    /// and no expiry. Equivalent to
+    /// `issue_grant_with_options(.., GrantOptions::default())`.
     pub fn issue_grant(
         &self,
         principal: impl Into<PrincipalId>,
         capabilities: &[(CapabilityId, Vec<usize>)],
+    ) -> Result<GrantToken> {
+        self.issue_grant_with_options(principal, capabilities, GrantOptions::default())
+    }
+
+    /// Issue a grant that dies at `expires_at_unix` (Unix seconds).
+    ///
+    /// The expiry is covered by the signature and checked standalone by
+    /// [`GrantVerifier::verify`] / [`GrantVerifier::verify_at`] — no
+    /// controller round-trip (ADR-0001). The nonce is random.
+    pub fn issue_grant_with_expiry(
+        &self,
+        principal: impl Into<PrincipalId>,
+        capabilities: &[(CapabilityId, Vec<usize>)],
+        expires_at_unix: u64,
+    ) -> Result<GrantToken> {
+        self.issue_grant_with_options(
+            principal,
+            capabilities,
+            GrantOptions::with_expiry(expires_at_unix),
+        )
+    }
+
+    /// Issue a grant with explicit [`GrantOptions`] (nonce and/or expiry).
+    ///
+    /// `GrantOptions::with_nonce` gives deterministic issuance for tests;
+    /// the nonce never participates in the canonical capability sort.
+    pub fn issue_grant_with_options(
+        &self,
+        principal: impl Into<PrincipalId>,
+        capabilities: &[(CapabilityId, Vec<usize>)],
+        options: GrantOptions,
     ) -> Result<GrantToken> {
         let principal = principal.into();
         let key_bytes = self.signing_key.verifying_key().to_bytes();
@@ -232,33 +269,28 @@ impl CapabilityIssuer {
             .collect();
 
         // Canonical sort: by component-wise partition comparison, then by ID.
+        // The nonce is deliberately NOT part of the sort — issuance
+        // distinctness is carried by the signature alone (#20.1).
         entries.sort_by(|a, b| {
             a.partition
                 .cmp(&b.partition)
                 .then_with(|| a.id.as_str().cmp(b.id.as_str()))
         });
 
-        // Build signing message: principal || canonical_entries || issuer_key
-        let mut message = Vec::new();
-        message.extend_from_slice(principal.as_str().as_bytes());
-        message.push(0);
-        for entry in &entries {
-            message.extend_from_slice(entry.id.as_str().as_bytes());
-            message.push(0);
-            // Encode partition: u8 count, then u8 per part
-            message.push(entry.partition.len() as u8);
-            for &part in &entry.partition {
-                message.push(part as u8);
-            }
-        }
-        message.push(0);
-        message.extend_from_slice(&key_bytes);
-
+        let message = grant_signing_message(
+            principal.as_str(),
+            &entries,
+            &key_bytes,
+            &options.nonce,
+            options.expires_at,
+        );
         let signature = self.signing_key.sign(&message);
 
         Ok(GrantToken {
             principal,
             capabilities: entries,
+            nonce: options.nonce,
+            expires_at: options.expires_at,
             issuer_key: key_bytes.to_vec(),
             signature: signature.to_bytes().to_vec(),
         })
@@ -354,6 +386,87 @@ pub struct GrantCapability {
     pub partition: Vec<usize>,
 }
 
+/// Issuance options for a [`GrantToken`] (#20.1).
+///
+/// Controls the two token-carried lifecycle fields:
+/// - `nonce` — 16 random bytes by default, making every issuance distinct
+///   (a revoked grant can be cleanly re-issued from the same seed).
+/// - `expires_at` — optional Unix-seconds expiry covered by the signature;
+///   `None` means the grant does not expire (the pre-0.5.0 behavior).
+#[derive(Debug, Clone, Copy)]
+pub struct GrantOptions {
+    /// Unix-seconds instant after which the grant is dead (`None` = never).
+    ///
+    /// A grant is dead the instant `now >= expires_at` — the boundary is
+    /// inclusive (see [`GrantVerifier::verify_at`]).
+    pub expires_at: Option<u64>,
+    /// Issuance nonce — included in the signature, not in the capability sort.
+    pub nonce: [u8; 16],
+}
+
+impl Default for GrantOptions {
+    /// No expiry, random nonce.
+    fn default() -> Self {
+        Self {
+            expires_at: None,
+            nonce: rand::random(),
+        }
+    }
+}
+
+impl GrantOptions {
+    /// A grant expiring at `expires_at_unix` (Unix seconds), random nonce.
+    pub fn with_expiry(expires_at_unix: u64) -> Self {
+        Self {
+            expires_at: Some(expires_at_unix),
+            ..Self::default()
+        }
+    }
+
+    /// A deterministic nonce (tests, reproducible issuance), no expiry.
+    pub fn with_nonce(nonce: [u8; 16]) -> Self {
+        Self {
+            nonce,
+            ..Self::default()
+        }
+    }
+}
+
+/// Canonical signing message for a grant (#20.1 layout).
+///
+/// `principal || 0 || caps(id || 0 || len || parts) || 0 || issuer_key ||
+/// nonce(16) || tag(1) || [expiry u64 BE]`
+///
+/// Shared by issuance and verification so the two constructions can never
+/// drift apart.
+fn grant_signing_message(
+    principal: &str,
+    capabilities: &[GrantCapability],
+    issuer_key: &[u8],
+    nonce: &[u8; 16],
+    expires_at: Option<u64>,
+) -> Vec<u8> {
+    let mut message = Vec::new();
+    message.extend_from_slice(principal.as_bytes());
+    message.push(0);
+    for cap in capabilities {
+        message.extend_from_slice(cap.id.as_str().as_bytes());
+        message.push(0);
+        message.push(cap.partition.len() as u8);
+        for &part in &cap.partition {
+            message.push(part as u8);
+        }
+    }
+    message.push(0);
+    message.extend_from_slice(issuer_key);
+    message.extend_from_slice(nonce);
+    message.push(u8::from(expires_at.is_some()));
+    if let Some(expiry) = expires_at {
+        message.extend_from_slice(&expiry.to_be_bytes());
+    }
+    message
+}
+
 /// A multi-capability grant token.
 ///
 /// A grant carries a principal, a set of capabilities (each with its
@@ -371,6 +484,19 @@ pub struct GrantToken {
     pub principal: PrincipalId,
     /// The granted capabilities with their partitions.
     pub capabilities: Vec<GrantCapability>,
+    /// Issuance nonce — makes every issuance distinct (#20.1).
+    ///
+    /// Covered by the signature, deliberately excluded from the canonical
+    /// capability sort. Without it, re-issuing the same grant from the same
+    /// seed yields a byte-identical bearer, so a revocation entry keyed by
+    /// content hash would kill the re-issue along with the original.
+    pub nonce: [u8; 16],
+    /// Optional expiry (Unix seconds), covered by the signature (#20.1).
+    ///
+    /// `None` = the grant does not expire (the pre-0.5.0 behavior).
+    /// Checked by the verifier standalone — no controller round-trip — which
+    /// is what federation satellites need (ADR-0001).
+    pub expires_at: Option<u64>,
     /// The issuer's public key (Ed25519, 32 bytes).
     pub issuer_key: Vec<u8>,
     /// Ed25519 signature over the canonical encoding of principal,
@@ -389,7 +515,14 @@ impl GrantToken {
     ///   u8 partition_len | partition bytes
     /// 32 bytes issuer public key
     /// 64 bytes Ed25519 signature
+    /// 16 bytes nonce
+    /// u8 expiry tag (0 = none, 1 = present)
+    /// [8 bytes u64 BE expires_at] (present iff tag = 1)
     /// ```
+    ///
+    /// The trailing nonce + expiry fields are new in v0.5.0 (#20.1); the
+    /// layout change is breaking per ADR-0001 (Ijima, the sole bearer
+    /// holder, re-mints on upgrade).
     pub fn to_bytes(token: &Self) -> Vec<u8> {
         let mut buf = Vec::new();
         let p = token.principal.as_str().as_bytes();
@@ -407,6 +540,11 @@ impl GrantToken {
         }
         buf.extend_from_slice(&token.issuer_key);
         buf.extend_from_slice(&token.signature);
+        buf.extend_from_slice(&token.nonce);
+        buf.push(u8::from(token.expires_at.is_some()));
+        if let Some(expiry) = token.expires_at {
+            buf.extend_from_slice(&expiry.to_be_bytes());
+        }
         buf
     }
 
@@ -440,6 +578,23 @@ impl GrantToken {
         }
         let issuer_key = read_bytes(bytes, &mut pos, ISSUER_KEY_LEN)?;
         let signature = read_bytes(bytes, &mut pos, SIG_LEN)?;
+        let nonce: [u8; 16] = read_bytes(bytes, &mut pos, 16)?
+            .try_into()
+            .map_err(|_| SchubertError::CryptoVerificationFailed("bad nonce length".into()))?;
+        let tag = read_u8(bytes, &mut pos)?;
+        let expires_at = match tag {
+            0 => None,
+            1 => {
+                let mut buf = [0u8; 8];
+                buf.copy_from_slice(read_bytes(bytes, &mut pos, 8)?);
+                Some(u64::from_be_bytes(buf))
+            }
+            _ => {
+                return Err(SchubertError::CryptoVerificationFailed(
+                    "invalid expiry tag in grant token".into(),
+                ))
+            }
+        };
         if pos != bytes.len() {
             return Err(SchubertError::CryptoVerificationFailed(
                 "trailing bytes in grant token".into(),
@@ -448,6 +603,8 @@ impl GrantToken {
         Ok(GrantToken {
             principal: PrincipalId::new(principal),
             capabilities,
+            nonce,
+            expires_at,
             issuer_key: issuer_key.to_vec(),
             signature: signature.to_vec(),
         })
@@ -473,11 +630,51 @@ impl GrantVerifier {
         Self { verifying_key }
     }
 
-    /// Verify a grant token's Ed25519 signature.
+    /// Verify a grant token: signature first, then expiry (ADR-0001).
     ///
-    /// Reconstructs the signing message from the token's fields and
-    /// checks the signature against the issuer's public key.
+    /// Uses the system wall clock. For deterministic tests or replay, use
+    /// [`verify_at`](Self::verify_at). Caller-side revocation composes
+    /// afterward as an OR (access = valid signature AND not expired AND not
+    /// revoked).
+    ///
+    /// # Errors
+    ///
+    /// [`SchubertError::CryptoVerificationFailed`] if the signature or issuer
+    /// key is wrong; [`SchubertError::GrantExpired`] if the grant has expired.
     pub fn verify(&self, grant: &GrantToken) -> Result<()> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| SchubertError::CryptoVerificationFailed(format!("clock error: {e}")))?
+            .as_secs();
+        self.verify_at(grant, now)
+    }
+
+    /// Verify a grant token at an explicit Unix time — deterministic.
+    ///
+    /// Verification order: signature, then expiry (ADR-0001 rule 2). A grant
+    /// is expired the instant `now_unix >= expires_at` — **the boundary is
+    /// inclusive**. Clock-skew tolerance is the verifier's concern, not the
+    /// token's (rule 3): near trust boundaries, callers may widen `now_unix`
+    /// or pre/post-pad before calling.
+    ///
+    /// # Errors
+    ///
+    /// Same as [`verify`](Self::verify).
+    pub fn verify_at(&self, grant: &GrantToken, now_unix: u64) -> Result<()> {
+        self.verify_signature(grant)?;
+        if let Some(expires_at) = grant.expires_at {
+            if now_unix >= expires_at {
+                return Err(SchubertError::GrantExpired {
+                    expires_at,
+                    now: now_unix,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Check the Ed25519 signature over the canonical grant encoding.
+    fn verify_signature(&self, grant: &GrantToken) -> Result<()> {
         // Verify the issuer key matches
         if grant.issuer_key != self.verifying_key.to_bytes() {
             return Err(SchubertError::CryptoVerificationFailed(
@@ -485,20 +682,14 @@ impl GrantVerifier {
             ));
         }
 
-        // Reconstruct signing message (must match issue_grant exactly)
-        let mut message = Vec::new();
-        message.extend_from_slice(grant.principal.as_str().as_bytes());
-        message.push(0);
-        for cap in &grant.capabilities {
-            message.extend_from_slice(cap.id.as_str().as_bytes());
-            message.push(0);
-            message.push(cap.partition.len() as u8);
-            for &part in &cap.partition {
-                message.push(part as u8);
-            }
-        }
-        message.push(0);
-        message.extend_from_slice(&grant.issuer_key);
+        // Reconstruct signing message (shared with issue_grant — cannot drift)
+        let message = grant_signing_message(
+            grant.principal.as_str(),
+            &grant.capabilities,
+            &grant.issuer_key,
+            &grant.nonce,
+            grant.expires_at,
+        );
 
         let sig_bytes: [u8; 64] = grant.signature.as_slice().try_into().map_err(|_| {
             SchubertError::CryptoVerificationFailed("invalid grant signature length".into())
@@ -533,6 +724,167 @@ impl GrantVerifier {
             .any(|cap| partitions_le(cap_partition, &cap.partition))
     }
 }
+
+// ---------------------------------------------------------------------------
+// Policy → issuance linkage — #20.3
+// ---------------------------------------------------------------------------
+
+#[cfg(all(feature = "crypto", feature = "policy"))]
+mod policy_issuance {
+    use super::{
+        CapabilityId, CapabilityIssuer, GrantCapability, GrantOptions, GrantToken, PrincipalId,
+    };
+    use crate::error::{Result, SchubertError};
+    use std::collections::HashMap;
+
+    /// Policy-derived constraints on grant issuance (#20.3).
+    ///
+    /// Answers *what grants may be issued*, derived from a validated
+    /// [`PolicyConfig`](crate::policy::PolicyConfig): a principal may be issued
+    /// exactly the `(id, partition)` pairs their policy entry entitles — **both**
+    /// the capability id and its Schubert partition must match, so a caller
+    /// cannot smuggle a stronger geometry under an allowed id. This closes the
+    /// seam between the policy layer (`from_policy_toml` → `AccessController`)
+    /// and the crypto layer (`CapabilityIssuer` → `GrantToken`): consumers like
+    /// Ijima can own policy while principals carry proof-carrying grants.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use schubert::crypto::{issue_grant_under_policy, CapabilityIssuer, GrantOptions, GrantPolicy};
+    /// # use schubert::policy::PolicyConfig;
+    /// let policy_toml = r#"
+    /// [grassmannian]
+    /// k = 2
+    /// n = 4
+    ///
+    /// [capabilities.read]
+    /// partition = [1]
+    /// kind = "ReadLike"
+    /// label = "Read"
+    ///
+    /// [principals.alice]
+    /// grants = ["read"]
+    /// "#;
+    /// let policy = GrantPolicy::from_policy(&PolicyConfig::from_toml(policy_toml).unwrap()).unwrap();
+    /// let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+    ///
+    /// // Entitled issuance succeeds and verifies; anything else is denied.
+    /// let grant = issue_grant_under_policy(
+    ///     &issuer, &policy, "alice",
+    ///     &[("read".into(), vec![1])],
+    ///     GrantOptions::default(),
+    /// ).unwrap();
+    /// # let _ = grant;
+    /// ```
+    #[derive(Debug, Clone)]
+    pub struct GrantPolicy {
+        entitled: HashMap<PrincipalId, Vec<GrantCapability>>,
+    }
+
+    impl GrantPolicy {
+        /// Derive issuance constraints from a validated policy.
+        ///
+        /// # Errors
+        ///
+        /// Propagates the policy's own validation errors (bad partitions,
+        /// unknown capability references, invalid Grassmannian).
+        pub fn from_policy(policy: &crate::policy::PolicyConfig) -> Result<Self> {
+            policy.validate()?;
+            let mut entitled: HashMap<PrincipalId, Vec<GrantCapability>> = HashMap::new();
+            for (name, principal) in &policy.principals {
+                let caps = principal
+                    .grants
+                    .iter()
+                    .filter_map(|id| {
+                        policy.capabilities.get(id).map(|c| GrantCapability {
+                            id: CapabilityId::new(id.clone()),
+                            partition: c.partition.clone(),
+                        })
+                    })
+                    .collect();
+                entitled.insert(PrincipalId::new(name.clone()), caps);
+            }
+            Ok(Self { entitled })
+        }
+
+        /// Check an issuance request against the policy.
+        ///
+        /// `Ok(())` iff every requested `(id, partition)` pair is exactly what
+        /// the policy entitles this principal. Fails closed: unknown principals
+        /// and partition mismatches are both denials.
+        ///
+        /// # Errors
+        ///
+        /// [`SchubertError::GrantDeniedByPolicy`] naming the first offending
+        /// capability.
+        pub fn may_issue(
+            &self,
+            principal: &PrincipalId,
+            capabilities: &[(CapabilityId, Vec<usize>)],
+        ) -> Result<()> {
+            let entitled =
+                self.entitled
+                    .get(principal)
+                    .ok_or_else(|| SchubertError::GrantDeniedByPolicy {
+                        principal: principal.to_string(),
+                        capability: capabilities
+                            .first()
+                            .map(|(id, _)| id.to_string())
+                            .unwrap_or_default(),
+                    })?;
+
+            for (id, partition) in capabilities {
+                let ok = entitled
+                    .iter()
+                    .any(|e| &e.id == id && e.partition == *partition);
+                if !ok {
+                    return Err(SchubertError::GrantDeniedByPolicy {
+                        principal: principal.to_string(),
+                        capability: id.to_string(),
+                    });
+                }
+            }
+            Ok(())
+        }
+
+        /// The exact grant pairs this policy entitles the principal to
+        /// (borrowed; empty slice for principals absent from the policy).
+        pub fn grants_for(&self, principal: &PrincipalId) -> &[GrantCapability] {
+            self.entitled
+                .get(principal)
+                .map(|v| v.as_slice())
+                .unwrap_or(&[])
+        }
+    }
+
+    /// Issue a grant constrained by policy (#20.3): check first, then sign.
+    ///
+    /// Composes [`GrantPolicy::may_issue`] with
+    /// [`CapabilityIssuer::issue_grant_with_options`] — the single seam both
+    /// the controller path and raw issuance share. On success the grant is
+    /// policy-entitled, signed, and carries the given options (nonce/expiry,
+    /// ADR-0001).
+    ///
+    /// # Errors
+    ///
+    /// [`SchubertError::GrantDeniedByPolicy`] if the request exceeds the
+    /// entitlement; otherwise the issuer's own errors.
+    pub fn issue_grant_under_policy(
+        issuer: &CapabilityIssuer,
+        policy: &GrantPolicy,
+        principal: impl Into<PrincipalId>,
+        capabilities: &[(CapabilityId, Vec<usize>)],
+        options: GrantOptions,
+    ) -> Result<GrantToken> {
+        let principal = principal.into();
+        policy.may_issue(&principal, capabilities)?;
+        issuer.issue_grant_with_options(principal, capabilities, options)
+    }
+}
+
+#[cfg(all(feature = "crypto", feature = "policy"))]
+pub use policy_issuance::{issue_grant_under_policy, GrantPolicy};
 
 // ---------- partition helpers ----------
 
@@ -978,6 +1330,177 @@ mod tests {
         assert_eq!(tokens.len(), 2);
     }
 
+    // --- #20.1: expiry & nonce -------------------------------------------------
+
+    #[test]
+    fn grant_expiry_future_verifies() {
+        let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+        let grant = issuer
+            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], 2_000_000)
+            .unwrap();
+        let verifier = GrantVerifier::new(issuer.public_key());
+        assert!(verifier.verify_at(&grant, 1_000_000).is_ok());
+    }
+
+    #[test]
+    fn grant_expiry_past_rejected() {
+        let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+        let grant = issuer
+            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], 1_000_000)
+            .unwrap();
+        let verifier = GrantVerifier::new(issuer.public_key());
+        let err = verifier.verify_at(&grant, 2_000_000).unwrap_err();
+        assert!(matches!(
+            err,
+            SchubertError::GrantExpired {
+                expires_at: 1_000_000,
+                now: 2_000_000
+            }
+        ));
+    }
+
+    #[test]
+    fn grant_expiry_boundary_is_inclusive() {
+        let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+        let grant = issuer
+            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], 1_000_000)
+            .unwrap();
+        let verifier = GrantVerifier::new(issuer.public_key());
+        // Alive one second before the boundary, dead *at* it.
+        assert!(verifier.verify_at(&grant, 999_999).is_ok());
+        assert!(verifier.verify_at(&grant, 1_000_000).is_err());
+    }
+
+    #[test]
+    fn grant_without_expiry_never_expires() {
+        let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+        let grant = issuer
+            .issue_grant("alice", &[grant_cap("read", vec![1])])
+            .unwrap();
+        let verifier = GrantVerifier::new(issuer.public_key());
+        assert!(verifier.verify_at(&grant, u64::MAX).is_ok());
+    }
+
+    #[test]
+    fn verify_wall_clock_checks_expiry() {
+        let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+        let verifier = GrantVerifier::new(issuer.public_key());
+
+        let dead = issuer
+            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], 1)
+            .unwrap();
+        assert!(matches!(
+            verifier.verify(&dead),
+            Err(SchubertError::GrantExpired { .. })
+        ));
+
+        let alive = issuer
+            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], u64::MAX)
+            .unwrap();
+        assert!(verifier.verify(&alive).is_ok());
+    }
+
+    #[test]
+    fn grant_nonce_makes_issues_distinct() {
+        let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+        let a = issuer
+            .issue_grant("alice", &[grant_cap("read", vec![1])])
+            .unwrap();
+        let b = issuer
+            .issue_grant("alice", &[grant_cap("read", vec![1])])
+            .unwrap();
+        assert_ne!(a.nonce, b.nonce);
+        assert_ne!(GrantToken::to_bytes(&a), GrantToken::to_bytes(&b));
+
+        let verifier = GrantVerifier::new(issuer.public_key());
+        assert!(verifier.verify(&a).is_ok());
+        assert!(verifier.verify(&b).is_ok());
+    }
+
+    #[test]
+    fn grant_injected_nonce_is_deterministic() {
+        let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+        let a = issuer
+            .issue_grant_with_options(
+                "alice",
+                &[grant_cap("read", vec![1])],
+                GrantOptions::with_nonce([9u8; 16]),
+            )
+            .unwrap();
+        let b = issuer
+            .issue_grant_with_options(
+                "alice",
+                &[grant_cap("read", vec![1])],
+                GrantOptions::with_nonce([9u8; 16]),
+            )
+            .unwrap();
+        assert_eq!(GrantToken::to_bytes(&a), GrantToken::to_bytes(&b));
+    }
+
+    #[test]
+    fn grant_tamper_nonce_or_expiry_breaks_signature() {
+        let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+        let verifier = GrantVerifier::new(issuer.public_key());
+        let grant = issuer
+            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], 2_000_000)
+            .unwrap();
+
+        // Flip a nonce byte -> signature failure (signature checked before expiry).
+        let mut tampered = grant.clone();
+        tampered.nonce[0] ^= 1;
+        assert!(matches!(
+            verifier.verify_at(&tampered, 1_000_000),
+            Err(SchubertError::CryptoVerificationFailed(_))
+        ));
+
+        // Strip the expiry -> signature failure.
+        let mut stripped = grant.clone();
+        stripped.expires_at = None;
+        assert!(verifier.verify_at(&stripped, 1_000_000).is_err());
+    }
+
+    #[test]
+    fn grant_canonical_sort_unaffected_by_nonce() {
+        let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+        let a = issuer
+            .issue_grant(
+                "alice",
+                &[grant_cap("write", vec![2]), grant_cap("read", vec![1])],
+            )
+            .unwrap();
+        let b = issuer
+            .issue_grant(
+                "alice",
+                &[grant_cap("read", vec![1]), grant_cap("write", vec![2])],
+            )
+            .unwrap();
+        assert_eq!(a.capabilities, b.capabilities);
+    }
+
+    #[test]
+    fn grant_wire_roundtrip_preserves_expiry_and_nonce() {
+        let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+        let nonce = [4u8; 16];
+        let grant = issuer
+            .issue_grant_with_options(
+                "alice",
+                &[
+                    grant_cap("read", vec![1]),
+                    grant_cap("admin", vec![4, 4, 4, 4]),
+                ],
+                GrantOptions {
+                    expires_at: Some(1_234_567_890),
+                    nonce,
+                },
+            )
+            .unwrap();
+        let bytes = GrantToken::to_bytes(&grant);
+        let back = GrantToken::from_bytes(&bytes).unwrap();
+        assert_eq!(back.expires_at, Some(1_234_567_890));
+        assert_eq!(back.nonce, nonce);
+        assert_eq!(back, grant);
+    }
+
     // --- #16.5: KeyStore ---
 
     #[test]
@@ -1024,5 +1547,111 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    // --- #20.3: policy -> issuance linkage -------------------------------------
+    #[cfg(all(feature = "crypto", feature = "policy"))]
+    mod policy_link {
+        use super::*;
+        use crate::policy::PolicyConfig;
+
+        const LINK_POLICY_TOML: &str = r#"
+[grassmannian]
+k = 2
+n = 4
+
+[capabilities.read]
+partition = [1]
+kind = "ReadLike"
+label = "Read"
+
+[capabilities.write]
+partition = [2]
+kind = "WriteLike"
+label = "Write"
+
+[principals.alice]
+grants = ["read", "write"]
+
+[principals.bob]
+grants = ["read"]
+"#;
+
+        fn link_policy() -> PolicyConfig {
+            PolicyConfig::from_toml(LINK_POLICY_TOML).unwrap()
+        }
+
+        #[test]
+        fn grant_policy_allows_entitled_issuance() {
+            let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
+            let issuer = CapabilityIssuer::from_seed([21u8; 32]);
+            let caps = vec![grant_cap("read", vec![1]), grant_cap("write", vec![2])];
+
+            policy.may_issue(&PrincipalId::new("alice"), &caps).unwrap();
+
+            let grant =
+                issue_grant_under_policy(&issuer, &policy, "alice", &caps, GrantOptions::default())
+                    .unwrap();
+            GrantVerifier::new(issuer.public_key())
+                .verify(&grant)
+                .unwrap();
+        }
+
+        #[test]
+        fn grant_policy_denies_unentitled_capability() {
+            let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
+            let caps = vec![grant_cap("write", vec![2])];
+            let err = policy
+                .may_issue(&PrincipalId::new("bob"), &caps)
+                .unwrap_err();
+            assert!(matches!(
+                err,
+                SchubertError::GrantDeniedByPolicy {
+                    ref principal,
+                    ref capability
+                } if principal == "bob" && capability == "write"
+            ));
+        }
+
+        #[test]
+        fn grant_policy_denies_unknown_principal() {
+            let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
+            let caps = vec![grant_cap("read", vec![1])];
+            let err = policy
+                .may_issue(&PrincipalId::new("mallory"), &caps)
+                .unwrap_err();
+            assert!(matches!(
+                err,
+                SchubertError::GrantDeniedByPolicy { ref principal, .. } if principal == "mallory"
+            ));
+        }
+
+        #[test]
+        fn grant_policy_denies_partition_mismatch() {
+            let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
+            let caps = vec![grant_cap("read", vec![2])];
+            assert!(policy.may_issue(&PrincipalId::new("alice"), &caps).is_err());
+        }
+
+        #[test]
+        fn issue_under_policy_honors_expiry_options() {
+            let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
+            let issuer = CapabilityIssuer::from_seed([21u8; 32]);
+            let caps = vec![grant_cap("read", vec![1])];
+            let grant = issue_grant_under_policy(
+                &issuer,
+                &policy,
+                "bob",
+                &caps,
+                GrantOptions::with_expiry(1_500_000_000),
+            )
+            .unwrap();
+            let verifier = GrantVerifier::new(issuer.public_key());
+            verifier.verify_at(&grant, 1_000_000).unwrap();
+            assert!(matches!(
+                verifier.verify_at(&grant, 1_500_000_000),
+                Err(SchubertError::GrantExpired { .. })
+            ));
+        }
     }
 }

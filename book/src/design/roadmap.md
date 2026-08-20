@@ -37,6 +37,12 @@
 
 ## Speculative Directions
 
+> **Living roadmap:** the current, status-tracked roadmap (v0.1.0–v0.4.0
+> shipped; v0.5.0 Grant Lifecycle; #17–#19 research directions) lives in
+> [`docs/ROADMAP.md`](https://github.com/Industrial-Algebra/Schubert/blob/develop/docs/ROADMAP.md)
+> — the list below is the original design-era exploration set, kept for
+> context.
+
 These are research explorations, not commitments:
 
 1. **Persistent backends** — SQLite, PostgreSQL, Redis storage layers

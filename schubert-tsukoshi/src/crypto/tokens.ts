@@ -11,6 +11,7 @@ import {
   toHex,
   writeLenString,
   writeU16,
+  writeU64BE,
   writeU8,
 } from "./wire.js";
 import { partitionsLe } from "../partition.js";
@@ -22,6 +23,7 @@ ed.etc.sha512Sync = (...m: Uint8Array[]) => sha512(ed.etc.concatBytes(...m));
 
 const ISSUER_KEY_LEN = 32;
 const SIG_LEN = 64;
+const NONCE_LEN = 16;
 
 /** UTF-8 encode a string to bytes. */
 function utf8(s: string): Uint8Array {
@@ -52,6 +54,35 @@ export interface GrantToken {
   readonly capabilities: readonly GrantCapability[];
   readonly issuerKey: Uint8Array;
   readonly signature: Uint8Array;
+  /**
+   * Issuance nonce (16 bytes, v0.5.0 #20.1) — covered by the signature,
+   * deliberately excluded from the canonical capability sort. Makes every
+   * issuance distinct, so a revoked grant can be cleanly re-issued from the
+   * same seed (renewal = re-issue).
+   */
+  readonly nonce: Uint8Array;
+  /**
+   * Signed expiry in Unix seconds (v0.5.0 #20.1); `null` = never expires
+   * (the pre-v0.5.0 behavior). Checked standalone by the verifier — a grant
+   * is dead the instant `now >= expiresAt` (inclusive boundary, matching
+   * Rust `verify_at`).
+   */
+  readonly expiresAt: number | null;
+}
+
+/** Options for {@link Issuer.issueGrant} (#20.1). */
+export interface GrantIssueOptions {
+  /** 16-byte issuance nonce; defaults to cryptographically random. */
+  readonly nonce?: Uint8Array;
+  /** Unix-seconds expiry covered by the signature; defaults to none. */
+  readonly expiresAt?: number | null;
+}
+
+/** Generate a random 16-byte issuance nonce via Web Crypto. */
+export function randomNonce(): Uint8Array {
+  const nonce = new Uint8Array(NONCE_LEN);
+  crypto.getRandomValues(nonce);
+  return nonce;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,15 +132,20 @@ function singleSigningMessage(
 }
 
 /**
- * GrantToken signing message:
+ * GrantToken signing message (byte-exact mirror of Rust `grant_signing_message`):
  *   principal | 0x00 |
  *   (per cap, canonically sorted: id | 0x00 | part_len_u8 | part bytes) |
- *   0x00 | issuerKey
+ *   0x00 | issuerKey | nonce(16) | tag(1) | [expires_at u64 BE]
+ *
+ * The nonce and expiry trail the issuer key; the tag is 1 iff an expiry is
+ * present. Shared by issuance and verification so the two cannot drift.
  */
 function grantSigningMessage(
   principal: string,
   capabilities: readonly GrantCapability[],
   issuerKey: Uint8Array,
+  nonce: Uint8Array,
+  expiresAt: number | null,
 ): Uint8Array {
   const parts: Uint8Array[] = [utf8(principal), new Uint8Array([0])];
   for (const cap of canonicallySorted(capabilities)) {
@@ -120,7 +156,17 @@ function grantSigningMessage(
     }
     parts.push(idBytes, new Uint8Array([0]), new Uint8Array([cap.partition.length]), partBytes);
   }
-  parts.push(new Uint8Array([0]), issuerKey);
+  parts.push(
+    new Uint8Array([0]),
+    issuerKey,
+    nonce,
+    new Uint8Array([expiresAt === null ? 0 : 1]),
+  );
+  if (expiresAt !== null) {
+    const expiry: number[] = [];
+    writeU64BE(expiry, expiresAt);
+    parts.push(toBytes(expiry));
+  }
   return concat(...parts);
 }
 
@@ -161,6 +207,9 @@ export function grantToBytes(token: GrantToken): Uint8Array {
   }
   pushBytes(buf, token.issuerKey);
   pushBytes(buf, token.signature);
+  pushBytes(buf, token.nonce);
+  writeU8(buf, token.expiresAt === null ? 0 : 1);
+  if (token.expiresAt !== null) writeU64BE(buf, token.expiresAt);
   return toBytes(buf);
 }
 
@@ -179,8 +228,16 @@ export function grantFromBytes(bytes: Uint8Array): GrantToken {
   }
   const issuerKey = copyBytes(r.bytes(ISSUER_KEY_LEN));
   const signature = copyBytes(r.bytes(SIG_LEN));
+  const nonce = copyBytes(r.bytes(NONCE_LEN));
+  const tag = r.u8();
+  let expiresAt: number | null = null;
+  if (tag === 1) {
+    expiresAt = r.u64();
+  } else if (tag !== 0) {
+    throw new Error("schubert-tsukoshi: invalid expiry tag in grant token");
+  }
   r.expectEnd();
-  return { principal, capabilities, issuerKey, signature };
+  return { principal, capabilities, issuerKey, signature, nonce, expiresAt };
 }
 
 function pushBytes(buf: number[], bytes: Uint8Array): void {
@@ -242,11 +299,19 @@ export class Issuer {
 
   /**
    * Issue a multi-capability grant. Capabilities are canonically sorted before
-   * signing, so grant order does not affect the signature.
+   * signing, so grant order does not affect the signature. Options (#20.1):
+   * pin the `nonce` for deterministic issuance, and/or set a signed
+   * `expiresAt` (Unix seconds) checked standalone by the verifier.
    */
-  issueGrant(principal: string, capabilities: readonly GrantCapability[]): GrantToken {
+  issueGrant(
+    principal: string,
+    capabilities: readonly GrantCapability[],
+    options: GrantIssueOptions = {},
+  ): GrantToken {
     const issuerKey = this.publicKey();
-    const message = grantSigningMessage(principal, capabilities, issuerKey);
+    const nonce = options.nonce ?? randomNonce();
+    const expiresAt = options.expiresAt ?? null;
+    const message = grantSigningMessage(principal, capabilities, issuerKey, nonce, expiresAt);
     const signature = ed.sign(message, this.seed);
     // Store capabilities in canonical order (as the Rust token does).
     return {
@@ -254,6 +319,8 @@ export class Issuer {
       capabilities: canonicallySorted(capabilities),
       issuerKey,
       signature,
+      nonce,
+      expiresAt,
     };
   }
 }
@@ -284,12 +351,33 @@ export class Verifier {
     }
   }
 
-  /** Verify a grant token's signature. Throws on failure. */
+  /** Verify a grant token: signature, then expiry, against the wall clock. */
   verifyGrant(grant: GrantToken): void {
+    this.verifyGrantAt(grant, Math.floor(Date.now() / 1000));
+  }
+
+  /**
+   * Verify a grant token at an explicit Unix time — deterministic (tests,
+   * replay). A grant is dead the instant `nowUnix >= expiresAt` (inclusive
+   * boundary, matching Rust `verify_at`); the signature is checked first, so
+   * a tampered nonce or expiry reads as a signature failure, not an expiry.
+   */
+  verifyGrantAt(grant: GrantToken, nowUnix: number): void {
     this.requireIssuerKey(grant.issuerKey);
-    const message = grantSigningMessage(grant.principal, grant.capabilities, grant.issuerKey);
+    const message = grantSigningMessage(
+      grant.principal,
+      grant.capabilities,
+      grant.issuerKey,
+      grant.nonce,
+      grant.expiresAt,
+    );
     if (!ed.verify(grant.signature, message, this.publicKey)) {
       throw new Error("schubert-tsukoshi: invalid grant token signature");
+    }
+    if (grant.expiresAt !== null && nowUnix >= grant.expiresAt) {
+      throw new Error(
+        `schubert-tsukoshi: grant expired: expires_at ${grant.expiresAt}, now ${nowUnix}`,
+      );
     }
   }
 

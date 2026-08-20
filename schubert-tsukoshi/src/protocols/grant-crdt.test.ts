@@ -231,3 +231,66 @@ describe("GrantCRDT — multi-principal, multi-capability integration", () => {
     expect(edge.may("root", [4, 4, 4, 4])).toBe(true); // root is admin
   });
 });
+
+describe("GrantCRDT — grant tombstones (#20.2, ADR-0002)", () => {
+  const N1 = "ab".repeat(16);
+  const N2 = "cd".repeat(16);
+
+  it("revokeGrant tombstones one issuance; isGrantRevoked is the read path", () => {
+    const a = new GrantCRDT("node-a");
+    a.revokeGrant(N1);
+    expect(a.isGrantRevoked(N1)).toBe(true);
+    expect(a.isGrantRevoked(N2)).toBe(false);
+  });
+
+  it("merge unions tombstones in both directions — and cannot resurrect", () => {
+    const a = new GrantCRDT("node-a");
+    const b = new GrantCRDT("node-b");
+    a.revokeGrant(N1);
+    b.revokeGrant(N2);
+    a.merge(b);
+    b.merge(a);
+    for (const r of [a, b]) {
+      expect(r.isGrantRevoked(N1)).toBe(true);
+      expect(r.isGrantRevoked(N2)).toBe(true);
+    }
+    // Even a concurrent op afterwards cannot remove a tombstone (grow-only).
+    b.grant("alice", { id: "read", partition: [1] });
+    a.merge(b);
+    expect(a.isGrantRevoked(N1)).toBe(true);
+    expect(a.isGrantRevoked(N2)).toBe(true);
+  });
+
+  it("tombstones leave (principal, capability) grants alone", () => {
+    const a = new GrantCRDT("node-a");
+    a.grant("alice", { id: "read", partition: [1] });
+    a.revokeGrant(N1);
+    expect(a.holds("alice", "read")).toBe(true);
+    expect(a.may("alice", [1])).toBe(true);
+  });
+
+  it("renewal = re-issue: a fresh nonce is not tombstoned", () => {
+    const a = new GrantCRDT("node-a");
+    a.revokeGrant(N1);
+    expect(a.isGrantRevoked(N1)).toBe(true);
+    expect(a.isGrantRevoked(N2)).toBe(false); // the rotated bearer lives
+  });
+
+  it("toJSON/fromJSON roundtrips tombstones", () => {
+    const a = new GrantCRDT("node-a");
+    a.revokeGrant(N1);
+    const snap = JSON.parse(JSON.stringify(a.toJSON()));
+    const b = GrantCRDT.fromJSON(snap, "node-b");
+    expect(b.isGrantRevoked(N1)).toBe(true);
+  });
+
+  it("legacy snapshots without tombstones deserialize to an empty set", () => {
+    const a = new GrantCRDT("node-a");
+    a.grant("alice", { id: "read", partition: [1] });
+    const snap = a.toJSON() as Record<string, unknown>;
+    delete snap.revokedGrants; // pre-#20.2 wire shape
+    const b = GrantCRDT.fromJSON(snap as never, "node-b");
+    expect(b.isGrantRevoked(N1)).toBe(false);
+    expect(b.holds("alice", "read")).toBe(true);
+  });
+});

@@ -66,3 +66,33 @@ Policies are validated on load:
 - CapabilityKind must be a valid variant
 
 Invalid policies return descriptive errors with context.
+
+## Constrained Issuance (v0.5.0)
+
+A policy can also constrain **what grants may be issued** from it — closing
+the seam between policy-driven controllers and proof-carrying bearer tokens
+(Roadmap #20.3). With `crypto` + `policy` enabled:
+
+```rust
+use schubert::crypto::{issue_grant_under_policy, CapabilityIssuer, GrantOptions, GrantPolicy};
+use schubert::policy::PolicyConfig;
+
+let policy = GrantPolicy::from_policy(&PolicyConfig::from_toml(toml_str)?)?;
+let issuer = CapabilityIssuer::from_seed(seed);
+
+// Entitled issuance: exact (id, partition) match required — signs + verifies.
+let grant = issue_grant_under_policy(
+    &issuer, &policy, "alice",
+    &[("read".into(), vec![1])],
+    GrantOptions::with_expiry(session_end),
+)?;
+
+// Anything beyond the entitlement is denied with a structured error:
+// GrantDeniedByPolicy { principal, capability } — including a stronger
+// partition smuggled under an allowed capability id.
+```
+
+The check fails closed: principals absent from the policy are entitled to
+nothing, and both the capability id **and** its Schubert partition must match
+the policy's own definition (the policy is the source of geometric truth —
+see [`crypto`](../api/crypto.md) for the token lifecycle this feeds).

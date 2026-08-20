@@ -1,11 +1,14 @@
 # Schubert — Directions
 
-> **v0.3.0 Snapshot** — All 14 core roadmap items complete. Karpal/Minuet
-> upgraded to Apache-2.0. Formal mapping substantiated via distributed game
-> sync design. 14 Proserpina critique findings addressed.
+> **v0.4.0 Snapshot** — All 14 core roadmap items complete, plus the v0.4.0
+> consumer-driven package: multi-capability `GrantToken`s, `schubert::axum`,
+> `KeyStore`, binary wire format, `check_single`, and the
+> `schubert-tsukoshi` npm package. Karpal/Minuet upgraded to Apache-2.0.
+> Formal mapping substantiated via distributed game sync design. 14 Proserpina
+> critique findings addressed.
 > See [CHANGELOG.md](../CHANGELOG.md) for version history.
 
-**Version:** 0.3.0 — Clean AGPL break. Formal foundation. Apache-2.0 throughout.
+**Version:** 0.4.0 — Consumer-driven grants. Apache-2.0 throughout.
 **Gitflow:** `main` (releases) ← `develop` (integration) ← `feature/*` (work)
 
 ---
@@ -28,6 +31,10 @@ optional `karpal-proof`, `karpal-verify`, `serde`, `rayon`, `toml`).
 - ✅ Proof-carrying capabilities (Ed25519 cryptographic tokens)
 - ✅ Constitutional verification (Karpal 0.5.0 integration)
 - ✅ Apache-2.0 dual-licensing
+- ✅ Multi-capability grant tokens + `GrantVerifier` (v0.4.0)
+- ✅ `schubert::axum` bearer extractor (v0.4.0)
+- ✅ `KeyStore`, binary wire format, `check_single` (v0.4.0)
+- ✅ `schubert-tsukoshi` npm package (v0.4.0)
 
 ---
 
@@ -180,6 +187,8 @@ congestion level, missing node, node listing).
 
 **Verified:** 8 tests (full/none, rational ordering, epsilon positive,
 epsilon hierarchy, mixed trust, roundtrip, conversion, detection).
+See `docs/surreal-trust-levels.md` for the expansion (rational/infinitesimal
+layers, the analytic φ(t) generalization).
 
 ### 12. Constitutional Verification — ✅ IMPLEMENTED (v0.1.0)
 
@@ -212,9 +221,15 @@ each trust level.
 
 ---
 
-## Near-Term (v0.4.0)
+## Shipped (v0.4.0)
 
-### 15. schubert-tsukoshi — Pure TypeScript Access Control
+### 15. schubert-tsukoshi — Pure TypeScript Access Control — ✅ DONE (v0.4.0)
+
+**Shipped** as [`@industrialalgebra/schubert-tsukoshi`](https://www.npmjs.com/package/@industrialalgebra/schubert-tsukoshi):
+zero-dependency core (LR tables for Gr(2,4)/Gr(3,6)/Gr(4,8), impossibility
+detection), an Ed25519 `crypto` subpath with a Rust-compatible wire format
+(tokens interop both directions), and a `protocols` subpath with `GrantCRDT`
+(replicated grant set over cliffy-tsukoshi's `VectorClock`).
 
 **Goal:** Extract Schubert's core access control model into a zero-dependency
 TypeScript package, following the cliffy-tsukoshi pattern.
@@ -247,7 +262,14 @@ TypeScript package, following the cliffy-tsukoshi pattern.
 the pattern this follows (pure TS extraction of geometric math from a Rust
 framework, with distributed protocols).
 
-### 16. Consumer-Driven API Polish (from Ijima Integration)
+### 16. Consumer-Driven API Polish (from Ijima Integration) — ✅ DONE (v0.4.0)
+
+**Shipped in full** (all six items): `axum` module (`AuthPrincipal` bearer
+extractor), multi-capability `GrantToken`/`GrantVerifier` with geometric
+containment (`may`), `crypto::KeyStore` (0600, atomic load-or-create), binary
+wire format on both token types, `from_seed`/`public_key_hex`, and
+`check_single`. Dominic's federation routing (M3) builds on the grant
+machinery — the second consumer.
 
 **Motivation:** Ijima — Schubert's first real consumer — revealed integration
 friction points. Each item below eliminates custom boilerplate Ijima had to
@@ -297,9 +319,146 @@ real consumer usage.
 
 ---
 
+## Near-Term (v0.5.0) — Grant Lifecycle (consumer-driven)
+
+### 20. Grant Lifecycle — expiry & nonce, grant-aware revocation, policy-issuance linkage
+
+**Origin:** The 0.4.0 consumer wave (Ijima → Dominic) shipped grants, but
+three lifecycle gaps are now pressing for the next consumers: **Wallace
+extensions** (capability-gated extension packages), **Dominic federation**
+(peer grants across instances), and **Ijima** (peer grants + the deferred
+`capability_policy_ref`). Each item below is verified against the 0.4.0 code.
+
+**1. `GrantToken` expiry & nonce (Ijima-driven — full spec below)**
+
+**Motivation (field friction, from the first real consumer):** Ijima
+v0.2.0 hardened its deployment path and hit two `GrantToken` gaps that
+policy-layer features cannot cover:
+
+1. **No token-carried expiry.** A bearer is valid until the issuer key
+dies. Ijima built a store-backed revocation list for *incidents*
+(kill a leaked token now — `docs/adr/token-revocation.md` in the Ijima
+repo), but *routine* deprovisioning (service-feed rotation, principal
+offboarding) wants TTLs the **verifier can check standalone** — critical
+for the v0.3 federation shape, where satellite instances verify grants
+without phoning home to a controller.
+2. **No nonce/jti.** `issue_grant` signs `(principal, capabilities,
+issuer_key)` — so re-issuing the same grant from the same seed yields a
+**byte-identical bearer**. A revoked token therefore cannot be cleanly
+re-issued: the revocation hash kills the re-issue too. A random nonce
+makes every issuance distinct.
+
+**Relationship to existing work:** the policy layer already has temporal
+access control (`Capability::expires_at`, `check_temporal()`, trust
+decay — item #8), but that requires the `AccessController` at check
+time. This item is the **crypto layer**: standalone, proof-carrying,
+verifier-side only.
+
+**Spec sketch:**
+
+- `GrantToken` gains `expires_at_unix: Option<u64>` (None = never) and
+  `nonce: [u8; 16]` (random at issue).
+- Both fields are covered by the signature: extend the canonical signing
+  message in `issue_grant` and `GrantVerifier::verify` identically.
+- The nonce is **not** part of the canonical capability sort — sort stays
+  `(partition, id)`; distinctness comes from the signed nonce alone.
+- Wire format: extend `GrantToken::to_bytes`/`from_bytes`. Breaking change
+to the blob layout is acceptable in a 0.x minor (Ijima re-mints; no
+external bearers exist beyond it).
+- `GrantVerifier::verify_at(grant, now_unix)` — deterministic,
+clock-injected variant — with `verify(grant)` delegating via
+`SystemTime::now()`. Expired ⇒ the same error class as a bad signature.
+- Issuer surface: `issue_grant` defaults `nonce = random`,
+  `expires_at = None`; add `issue_grant_with_expiry(principal, caps,
+  expires_at)` (and/or a builder) for explicit control. Deterministic
+  issuance for tests: allow injecting the nonce.
+- **tsukoshi parity:** mirror in
+  `@industrialalgebra/schubert-tsukoshi` (crypto subpath), including the
+  cross-language fixture test (Rust-issued ⇒ TS-verified, both expiry and
+  nonce paths).
+
+**Tests:**
+
+- Round trip: future expiry verifies, past expiry rejected,
+  `verify_at` determinism (same grant, injected clocks).
+- Distinctness: two `issue_grant` calls with identical inputs produce
+  different bytes, both verify (nonce works).
+- Tamper: flipping expiry or nonce bytes ⇒ signature failure.
+- Sort stability: capability ordering unchanged by nonce randomness.
+- Cross-language fixture (tsukoshi).
+
+**References:** Ijima `docs/adr/token-revocation.md` (complementary
+rationale — revocation = incidents, expiry = deprovisioning), Ijima
+`docs/adr/grant-token-migration.md` (consumer context), Schubert
+`docs/handoff-multi-capability-tokens.md` (GrantToken origin).
+
+**Interaction with consumer revocation** (per Anima PULSE 2026-08-17
+rec #5 — the half-page scoping it asked for): Ijima already runs a
+store-backed revocation list checked at verify. The composing rules the
+0.5 design must not leave undefined:
+
+- **Verify order:** consumers check revocation-or-expiry as one rejection
+  step — either answer is "dead", and which one fired is telemetry, not
+  semantics. `verify_at` returning a distinct error class for expiry lets
+  callers distinguish without a second API.
+- **Clock skew:** expiry is a wall-clock comparison; satellites may drift.
+  Recommended: document a skew tolerance (e.g. ±30s leeway on
+  `expires_at_unix` comparisons) or leave skew policy to the caller via
+  the injected clock in `verify_at` — either way, say which.
+- **Renewal = re-issue:** there is no renewal mutation; a rotated grant is
+  a fresh `issue_grant` (new nonce ⇒ distinct bearer), with the old one
+  expiring or being revoked. The nonce (this item) is what makes that
+  clean — document the pattern rather than adding a renewal API.
+
+**Scope:** ~2–4 days including tsukoshi parity.
+
+
+**2. Grant-aware CRDT revocation**
+`CrdtGrant` (crdt.rs) tracks a single `CapabilityId` — pre-`GrantToken`
+machinery. Multi-participant Wallace needs revoke-grant → converges across
+session participants; Ijima needs peer revocation; Dominic needs peer
+revocation converging across federation state. Either upgrade `CrdtGrant` to
+carry a grant id, or add revocation registries (tombstones) keyed by grant
+hash. `GrantCRDT` (tsukoshi) will need the parallel treatment.
+**Resolved: [ADR-0002](adr/0002-grant-crdt-revocation.md) — tombstone registry
+(grow-only set, union merge) keyed by the #20.1 issuance nonce; implemented in
+v0.5.0 (Rust `revoke_grant`/`is_grant_revoked`, tsukoshi
+`revokeGrant`/`isGrantRevoked`).**
+
+**3. Policy → issuance linkage**
+The controller path has `from_policy_toml` (#3); grants have
+`CapabilityIssuer` — but nothing connects them. The seam: policy.toml
+drives *what grants may be issued* (constrained issuance), so Ijima can own
+policy while principals carry grants — the capability-driven control-API
+design (Dominic ROADMAP §3.5 anticipates this).
+**Resolved (v0.5.0): `GrantPolicy` + `issue_grant_under_policy` (crypto × policy
+features) — issuance requires an exact `(id, partition)` entitlement match;
+`PolicyConfig::grants_for` is the feature-free entitlement view.**
+
+**Scope:** item 1 ~2–4 days (incl. tsukoshi parity, spec above); items 2–3 add
+~1 week. Same character as #16 — each item eliminates boilerplate a consumer
+has written or is about to write. Directly validated by the
+Wallace/Dominic/Ijima 2026-08 build wave.
+
+---
+
 ## Research Directions (v0.5.0+ and Beyond)
 
 ### 17. Compositional Wall-Crossing
+
+**v0.5.0 instrumentation:** `analyze_composed_stability` (probe; landed) + the
+`wall_crossing_probe` example (sweep). Measured baseline under the current
+engine: **additive** — walls are per-capability, and overlapping retained
+capabilities are deduplicated in the baseline (union semantics). An
+interaction-aware engine is what would produce genuine non-additivity.
+
+**Expanded:** see
+[`docs/design/wall-crossing-diffusion-composition.md`](design/wall-crossing-diffusion-composition.md)
+— the v0.5.0 framing via diffusion-LM composition for Quantizon (BPS
+non-additivity as a candidate formalism for emergence; tropical bridge). A
+KS-type composition probe (`analyze_composed_stability`) **landed in v0.5.0
+development** (PR #37, merged: computes `P_A`/`P_B`/`P_C` and tests additivity
+— see the [v0.5.0 sprint plan](plans/2026-08-17-v0.5.0-sprint-plan.md)).
 
 **Origin:** The stability-engine rabbit hole (2026-07-06) identified this as
 Schubert's deepest open theoretical question.

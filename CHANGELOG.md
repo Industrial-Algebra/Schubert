@@ -1,5 +1,77 @@
 # Changelog
 
+## [0.5.0] — 2026-08-20
+
+### Added
+
+- **`GrantToken` expiry & nonce (#20.1, ADR-0001)** — token-carried grant
+  lifecycle, verifier-checked standalone (no controller round-trip — what
+  federation satellites need):
+  - `expires_at: Option<u64>` (Unix seconds, **covered by the signature**;
+    `None` = never, the pre-0.5.0 behavior). A grant is dead the instant
+    `now >= expires_at` (inclusive boundary).
+  - `nonce: [u8; 16]` — random at issue, signed, **not** part of the canonical
+    capability sort. Makes every issuance distinct, so a revoked grant can be
+    cleanly re-issued from the same seed (renewal = re-issue, ADR-0001 rule 4).
+  - `GrantVerifier::verify_at(grant, now_unix)` — deterministic, clock-injected;
+    `verify(grant)` delegates via `SystemTime::now()`. Verification order:
+    signature, then expiry. New [`SchubertError::GrantExpired`] distinguishes a
+    dead grant from a forged one.
+  - Issuer surface: `issue_grant` (defaults), `issue_grant_with_expiry`,
+    `issue_grant_with_options(GrantOptions)` with injectable nonce for
+    deterministic tests.
+  - **Breaking wire-format change** (ADR-0001: acceptable in 0.x — Ijima, the
+    sole bearer holder, re-mints): `to_bytes`/`from_bytes` gain trailing
+    `nonce(16) | tag(1) | [expires_at u64 BE]`. tsukoshi parity follows.
+
+- **Grant-aware CRDT revocation (#20.2, ADR-0002)** — tombstone registry for
+  *specific issuances*: a grow-only set keyed by the #20.1 nonce, merged by
+  **union**, so a tombstoned grant can never be resurrected by any merge order
+  (the add-wins LWW map could not guarantee that). Renewal = re-issue stays
+  clean — the rotated grant carries a fresh nonce.
+  - Rust: `CrdtState::revoke_grant(nonce, node, ts)` / `is_grant_revoked(nonce)`;
+    blanket `(principal, capability)` `revoke` unchanged.
+  - tsukoshi: `GrantCRDT.revokeGrant(nonceHex)` / `isGrantRevoked(nonceHex)`;
+    snapshots carry the set, and pre-v0.5.0 snapshots deserialize to an empty
+    set (backward-tolerant).
+  - Access predicate now: valid signature AND not expired AND **not
+    tombstoned** AND not blanket-revoked (ADR-0001 rule 5, extended).
+
+- **Policy → issuance linkage (#20.3)** — policy.toml now constrains *what
+  grants may be issued*, so consumers (Ijima) can own policy while principals
+  carry proof-carrying grants:
+  - `GrantPolicy::from_policy(&PolicyConfig)` — validates, then derives the
+    entitlement map (gated `crypto` + `policy`).
+  - `GrantPolicy::may_issue(principal, caps)` — `Ok(())` iff every requested
+    `(id, partition)` pair **exactly** matches the entitlement; fails closed
+    (unknown principal = deny; partition mismatch = deny — no smuggling a
+    stronger geometry under an allowed id).
+  - `issue_grant_under_policy(issuer, policy, principal, caps, options)` —
+    check-then-sign in one seam, honoring [`GrantOptions`] (nonce/expiry).
+  - New [`SchubertError::GrantDeniedByPolicy { principal, capability }`].
+  - Feature-free view: `PolicyConfig::grants_for(principal)` returns the
+    entitled `(id, partition)` pairs.
+
+- **#17 instrument** — `analyze_composed_stability()`: computes `P_A`/`P_B`/`P_C`
+  and tests the KS-type additivity question empirically, plus the
+  `wall_crossing_probe` example sweeping a family of compositions. **Fix found
+  by the probe:** overlapping retained capabilities are deduplicated in the
+  additive baseline (union semantics — previously every overlap read as false
+  emergence); regression-tested.
+
+### Documentation
+
+- Rewrote AGENTS.md test baselines (219 all-features: 183 lib + 18 CLI + 18
+  doc; TypeScript 53: 12 controller + 18 crypto + 23 CRDT) and the
+  `dist/`-is-gitignored publish note.
+- New book sections across the sprint: `crypto.md` *Grant Expiry & Nonce*,
+  `axum.md` *expiry ⇒ 401*, `crdt.md` *Grant Tombstones*, `policy.md`
+  *Constrained Issuance*, `feature-flags.md` `crypto`×`policy` combination,
+  `tsukoshi.md` v0.5.0 subpath capabilities + two-layer composition note.
+- README v0.5.0 *What's New*; tsukoshi README documents the lifecycle options,
+  `verifyGrantAt`, and tombstone incident-response flow.
+
+
 ## [0.4.0] — 2026-07-19
 
 ### Added

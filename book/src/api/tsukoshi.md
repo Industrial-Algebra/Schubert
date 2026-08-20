@@ -14,8 +14,8 @@ backend and no WASM.
 | Subpath | What | Dependencies |
 |---|---|---|
 | `@industrialalgebra/schubert-tsukoshi` | Core: `AccessController`, LR tables, impossibility detection | none (zero-dep) |
-| `@industrialalgebra/schubert-tsukoshi/crypto` | Ed25519 `CapabilityToken` / `GrantToken` issue + verify | `@noble/ed25519`, `@noble/hashes` |
-| `@industrialalgebra/schubert-tsukoshi/protocols` | `GrantCRDT` — replicated grant set over cliffy-tsukoshi's `VectorClock` | `@cliffy-ga/tsukoshi` |
+| `@industrialalgebra/schubert-tsukoshi/crypto` | Ed25519 `CapabilityToken` / `GrantToken` issue + verify — **with signed expiry & issuance nonce (v0.5.0)**, `verifyGrantAt` deterministic clock | `@noble/ed25519`, `@noble/hashes` |
+| `@industrialalgebra/schubert-tsukoshi/protocols` | `GrantCRDT` — replicated grant set over cliffy-tsukoshi's `VectorClock`, **plus unresurrectable grant tombstones (v0.5.0)** | `@cliffy-ga/tsukoshi` |
 
 ## The killer feature, in the browser
 
@@ -40,10 +40,18 @@ acl.check(m, ["write", "dwide"]);
 ## Rust ↔ TypeScript interop
 
 The `crypto` subpath uses the **exact same Ed25519 wire format** as the Rust
-crate. Tokens issued in Rust verify in TypeScript and vice-versa — proven by a
-cross-validation test suite that asserts byte-identical output from a fixed
-seed. A Rust-backed service can issue grants that a TypeScript client verifies,
-or a TypeScript issuer can mint tokens a Rust verifier accepts.
+crate — including the v0.5.0 expiry and nonce fields. Tokens issued in Rust
+verify in TypeScript and vice-versa — proven by a cross-validation test suite
+that asserts byte-identical output from a fixed seed, covering both the expiry
+and nonce paths in both directions. A Rust-backed service can issue grants
+that a TypeScript client verifies, or a TypeScript issuer can mint tokens a
+Rust verifier accepts.
+
+The two token layers compose: `GrantToken` (crypto, proof-carrying) answers
+*is this bearer valid and unexpired?*, while `GrantCRDT` (protocols,
+trusted-replica) answers *is this capability currently granted here?* — and
+its tombstones can kill a specific issuance everywhere by nonce, in either
+language.
 
 ## Relationship to the Rust crate
 

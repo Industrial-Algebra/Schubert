@@ -1,6 +1,6 @@
 [package]
 name = "schubert"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 rust-version = "1.75"
 description = "Schubert calculus as a practical access control system — quantitative capability-based authorization"
@@ -87,6 +87,10 @@ name = "tsukoshi_crypto_vectors"
 path = "examples/tsukoshi_crypto_vectors.rs"
 required-features = ["crypto"]
 
+
+[[example]]
+name = "wall_crossing_probe"
+path = "examples/wall_crossing_probe.rs"
 
 [[bench]]
 name = "computation_paths"
