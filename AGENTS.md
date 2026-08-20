@@ -88,11 +88,12 @@ feature-dependent example needs an explicit `[[example]] required-features = [..
 in `Cargo.toml` or it breaks `cargo test` under default features. Zero clippy
 warnings is a release gate (`-D warnings`).
 
-**TypeScript** (`schubert-tsukoshi/`): `npm run build && npm test` (41 tests:
-12 controller + 12 crypto + 17 CRDT). `dist/` is tracked, so a build isn't
-required to publish — but run it as a verify.
+**TypeScript** (`schubert-tsukoshi/`): `npm run build && npm test` (53 tests:
+12 controller + 18 crypto + 23 CRDT). `dist/` is gitignored — run
+`npm run build` before `npm publish` (release checklist).
 
-Current Rust baseline: **193 tests** (159 lib + 18 CLI + 16 doc), zero clippy
+Current Rust baseline: **219 tests under `--all-features`** (183 lib + 18 CLI
++ 18 doc; 92 under default features), zero clippy
 across all six feature combinations.
 
 ---

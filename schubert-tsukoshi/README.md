@@ -90,9 +90,17 @@ const grant = issuer.issueGrant("alice", [
   { id: "memory:write", partition: [2] },
 ]);
 
+// v0.5.0 — grant lifecycle options: pin the nonce, or set a signed expiry.
+const session = issuer.issueGrant(
+  "alice",
+  [{ id: "memory:read", partition: [1] }],
+  { expiresAt: sessionEndUnix }, // random nonce by default
+);
+
 // Verifiers only need the public key.
 const verifier = new Verifier(issuer.publicKey());
-verifier.verifyGrant(grant);           // throws if signature invalid
+verifier.verifyGrant(grant);           // throws if signature invalid / expired
+verifier.verifyGrantAt(session, now);   // deterministic clock (tests, replay)
 verifier.may(grant, [1]);              // true — geometric containment
 
 // Wire format roundtrips and is Rust-compatible:
@@ -140,9 +148,13 @@ what capability* across leaderless replicas, built on `@cliffy-ga/tsukoshi`'s
 `VectorClock`. This is the **trusted-replica** counterpart to the
 proof-carrying tokens in `./crypto`:
 
-- `./crypto` (`GrantToken`) — untrusted clients present a signed bearer token.
+- `./crypto` (`GrantToken`) — untrusted clients present a signed bearer token
+  (v0.5.0: signed expiry + per-issuance nonce; renewal = re-issue).
 - `./protocols` (`GrantCRDT`) — trusted replicas converge on a shared grant set
-  and answer access queries from merged state.
+  and answer access queries from merged state. **v0.5.0 tombstones**:
+  `revokeGrant(nonceHex)` kills one *specific issuance* everywhere — a grow-only
+  set merged by union, so no merge order can resurrect it (unlike the add-wins
+  concurrent rule above, which is exactly why tombstones are a separate set).
 
 ```ts
 import { GrantCRDT } from "@industrialalgebra/schubert-tsukoshi/protocols";
@@ -155,6 +167,11 @@ const edge = new GrantCRDT("edge");
 edge.merge(hub);                  // edge converges to hub's grant set
 edge.may("alice", [1]);           // true — geometric containment over merged state
 edge.revoke("alice", "memory:write");
+
+// Incident response (v0.5.0): tombstone one bearer by its hex nonce
+// (toHex(grant.nonce), where toHex comes from the ./crypto subpath).
+hub.revokeGrant(leakedNonceHex);
+hub.isGrantRevoked(leakedNonceHex);   // true — everywhere, eventually
 
 // Snapshot/restore for transport:
 const snap = edge.toJSON();

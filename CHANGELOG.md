@@ -52,6 +52,18 @@
   - Feature-free view: `PolicyConfig::grants_for(principal)` returns the
     entitled `(id, partition)` pairs.
 
+### Documentation
+
+- Rewrote AGENTS.md test baselines (219 all-features: 183 lib + 18 CLI + 18
+  doc; TypeScript 53: 12 controller + 18 crypto + 23 CRDT) and the
+  `dist/`-is-gitignored publish note.
+- New book sections across the sprint: `crypto.md` *Grant Expiry & Nonce*,
+  `axum.md` *expiry ⇒ 401*, `crdt.md` *Grant Tombstones*, `policy.md`
+  *Constrained Issuance*, `feature-flags.md` `crypto`×`policy` combination,
+  `tsukoshi.md` v0.5.0 subpath capabilities + two-layer composition note.
+- README v0.5.0 *What's New*; tsukoshi README documents the lifecycle options,
+  `verifyGrantAt`, and tombstone incident-response flow.
+
 
 ## [0.4.0] — 2026-07-19
 

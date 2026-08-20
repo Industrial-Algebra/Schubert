@@ -13,7 +13,7 @@ breaking existing API.
 | `parallel` | `check_batch()`, `stability_batch()`, `compose_batch()` via rayon |
 | `policy` | `policy` module: TOML parsing, validate, roundtrip |
 | `wasm` | `wasm` module: WasmController with JS bindings |
-| `crypto` | `crypto` module: Ed25519 CapabilityToken, GrantToken, Issuer, Verifier, KeyStore |
+| `crypto` | `crypto` module: Ed25519 CapabilityToken, GrantToken (+ signed expiry & nonce), Issuer, Verifier, KeyStore |
 | `axum` | `axum` module: AuthPrincipal bearer-token extractor (enables `crypto`) |
 | `karpal-verify` | `verify` module: SMT/Lean proof obligations, Certified trust boundary |
 | `surreal` | `surreal_trust` module: RationalSurreal + EpsilonPolynomial |
@@ -24,6 +24,9 @@ breaking existing API.
 ```bash
 # Production with crypto tokens and policy loading
 cargo build --features serde,policy,crypto
+
+# Policy-constrained grant issuance (crypto x policy linkage, v0.5.0)
+cargo build --features crypto,policy
 
 # Web service with bearer-token auth
 cargo build --features axum
