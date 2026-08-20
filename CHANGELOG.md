@@ -52,6 +52,13 @@
   - Feature-free view: `PolicyConfig::grants_for(principal)` returns the
     entitled `(id, partition)` pairs.
 
+- **#17 instrument** — `analyze_composed_stability()`: computes `P_A`/`P_B`/`P_C`
+  and tests the KS-type additivity question empirically, plus the
+  `wall_crossing_probe` example sweeping a family of compositions. **Fix found
+  by the probe:** overlapping retained capabilities are deduplicated in the
+  additive baseline (union semantics — previously every overlap read as false
+  emergence); regression-tested.
+
 ### Documentation
 
 - Rewrote AGENTS.md test baselines (219 all-features: 183 lib + 18 CLI + 18
