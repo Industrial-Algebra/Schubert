@@ -216,6 +216,14 @@ cargo run --example rate_limiter      # Intersection-number rate limiting
 
 ## What's New
 
+### v0.5.0
+- **Grant Lifecycle** — token-carried, verifier-checked standalone (no controller round-trip):
+  - **Expiry & nonce** — signed `expires_at` (dead at `now >= expires_at`, inclusive) + per-issuance 16-byte nonce; renewal = re-issue (ADR-0001)
+  - **Grant tombstones** — unresurrectable revocation of specific issuances via grow-only nonce-keyed set, union-merged across replicas (ADR-0002)
+  - **Policy-constrained issuance** — `GrantPolicy`/`issue_grant_under_policy`: policy.toml gates *what grants may be issued*, exact `(id, partition)` match, fails closed (#20.3)
+  - **tsukoshi parity** — expiry, nonce, and tombstones mirrored in TypeScript with bidirectional cross-language fixtures
+- **#17 instrument** — `analyze_composed_stability()`: computes `P_A`/`P_B`/`P_C` and tests the KS-type additivity question empirically
+
 ### v0.4.0
 - **`schubert::axum` module** — bearer-token `AuthPrincipal` extractor (401 vs 500 split)
 - **Multi-capability grant tokens** — `GrantToken`/`GrantVerifier` with geometric containment (`may()`: write implies read, admin implies all)
