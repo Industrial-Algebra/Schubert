@@ -244,6 +244,28 @@ impl PolicyConfig {
         Ok(())
     }
 
+    /// The `(id, partition)` grant pairs this policy entitles a principal to
+    /// carry (#20.3 — the issuance-side view of `principals.*.grants`).
+    ///
+    /// Partitions come from the policy's capability table — the policy is the
+    /// source of geometric truth, not the requesting caller. Principals absent
+    /// from the policy are entitled to nothing.
+    pub fn grants_for(&self, principal: &str) -> Vec<(String, Vec<usize>)> {
+        self.principals
+            .get(principal)
+            .map(|p| {
+                p.grants
+                    .iter()
+                    .filter_map(|g| {
+                        self.capabilities
+                            .get(g)
+                            .map(|c| (g.clone(), c.partition.clone()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Apply the policy to an access controller.
     ///
     /// Creates all capabilities and principals, and grants the specified
@@ -415,5 +437,22 @@ n = 4
         config.validate().unwrap();
         assert!(config.capabilities.is_empty());
         assert!(config.principals.is_empty());
+    }
+
+    // --- #20.3: policy -> issuance linkage (entitlement view) ---------------
+
+    #[test]
+    fn grants_for_returns_capability_partitions() {
+        let config = PolicyConfig::from_toml(BASIC_POLICY).unwrap();
+        let alice = config.grants_for("alice");
+        assert_eq!(
+            alice,
+            vec![
+                ("read".to_string(), vec![1]),
+                ("write".to_string(), vec![2]),
+            ]
+        );
+        // A principal absent from the policy is entitled to nothing.
+        assert!(config.grants_for("nobody-here").is_empty());
     }
 }
