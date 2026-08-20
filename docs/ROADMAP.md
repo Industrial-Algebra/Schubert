@@ -431,6 +431,9 @@ The controller path has `from_policy_toml` (#3); grants have
 drives *what grants may be issued* (constrained issuance), so Ijima can own
 policy while principals carry grants — the capability-driven control-API
 design (Dominic ROADMAP §3.5 anticipates this).
+**Resolved (v0.5.0): `GrantPolicy` + `issue_grant_under_policy` (crypto × policy
+features) — issuance requires an exact `(id, partition)` entitlement match;
+`PolicyConfig::grants_for` is the feature-free entitlement view.**
 
 **Scope:** item 1 ~2–4 days (incl. tsukoshi parity, spec above); items 2–3 add
 ~1 week. Same character as #16 — each item eliminates boilerplate a consumer

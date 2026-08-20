@@ -122,6 +122,18 @@ pub enum SchubertError {
         now: u64,
     },
 
+    /// Grant issuance denied by policy (#20.3).
+    ///
+    /// The requested capability (or its partition) is not what the policy
+    /// entitles this principal to carry in a grant.
+    #[error("grant issuance denied by policy: principal '{principal}' is not entitled to capability '{capability}'")]
+    GrantDeniedByPolicy {
+        /// The principal the issuance was requested for.
+        principal: String,
+        /// The offending capability id.
+        capability: String,
+    },
+
     /// Rate limit exceeded for a principal.
     #[error("rate limit exceeded for principal '{principal}': {available:.2} tokens available out of {capacity:.2}")]
     RateLimitExceeded {

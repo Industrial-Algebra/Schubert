@@ -37,6 +37,21 @@
   - Access predicate now: valid signature AND not expired AND **not
     tombstoned** AND not blanket-revoked (ADR-0001 rule 5, extended).
 
+- **Policy → issuance linkage (#20.3)** — policy.toml now constrains *what
+  grants may be issued*, so consumers (Ijima) can own policy while principals
+  carry proof-carrying grants:
+  - `GrantPolicy::from_policy(&PolicyConfig)` — validates, then derives the
+    entitlement map (gated `crypto` + `policy`).
+  - `GrantPolicy::may_issue(principal, caps)` — `Ok(())` iff every requested
+    `(id, partition)` pair **exactly** matches the entitlement; fails closed
+    (unknown principal = deny; partition mismatch = deny — no smuggling a
+    stronger geometry under an allowed id).
+  - `issue_grant_under_policy(issuer, policy, principal, caps, options)` —
+    check-then-sign in one seam, honoring [`GrantOptions`] (nonce/expiry).
+  - New [`SchubertError::GrantDeniedByPolicy { principal, capability }`].
+  - Feature-free view: `PolicyConfig::grants_for(principal)` returns the
+    entitled `(id, partition)` pairs.
+
 
 ## [0.4.0] — 2026-07-19
 

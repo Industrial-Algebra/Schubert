@@ -725,6 +725,167 @@ impl GrantVerifier {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Policy → issuance linkage — #20.3
+// ---------------------------------------------------------------------------
+
+#[cfg(all(feature = "crypto", feature = "policy"))]
+mod policy_issuance {
+    use super::{
+        CapabilityId, CapabilityIssuer, GrantCapability, GrantOptions, GrantToken, PrincipalId,
+    };
+    use crate::error::{Result, SchubertError};
+    use std::collections::HashMap;
+
+    /// Policy-derived constraints on grant issuance (#20.3).
+    ///
+    /// Answers *what grants may be issued*, derived from a validated
+    /// [`PolicyConfig`](crate::policy::PolicyConfig): a principal may be issued
+    /// exactly the `(id, partition)` pairs their policy entry entitles — **both**
+    /// the capability id and its Schubert partition must match, so a caller
+    /// cannot smuggle a stronger geometry under an allowed id. This closes the
+    /// seam between the policy layer (`from_policy_toml` → `AccessController`)
+    /// and the crypto layer (`CapabilityIssuer` → `GrantToken`): consumers like
+    /// Ijima can own policy while principals carry proof-carrying grants.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use schubert::crypto::{issue_grant_under_policy, CapabilityIssuer, GrantOptions, GrantPolicy};
+    /// # use schubert::policy::PolicyConfig;
+    /// let policy_toml = r#"
+    /// [grassmannian]
+    /// k = 2
+    /// n = 4
+    ///
+    /// [capabilities.read]
+    /// partition = [1]
+    /// kind = "ReadLike"
+    /// label = "Read"
+    ///
+    /// [principals.alice]
+    /// grants = ["read"]
+    /// "#;
+    /// let policy = GrantPolicy::from_policy(&PolicyConfig::from_toml(policy_toml).unwrap()).unwrap();
+    /// let issuer = CapabilityIssuer::from_seed([7u8; 32]);
+    ///
+    /// // Entitled issuance succeeds and verifies; anything else is denied.
+    /// let grant = issue_grant_under_policy(
+    ///     &issuer, &policy, "alice",
+    ///     &[("read".into(), vec![1])],
+    ///     GrantOptions::default(),
+    /// ).unwrap();
+    /// # let _ = grant;
+    /// ```
+    #[derive(Debug, Clone)]
+    pub struct GrantPolicy {
+        entitled: HashMap<PrincipalId, Vec<GrantCapability>>,
+    }
+
+    impl GrantPolicy {
+        /// Derive issuance constraints from a validated policy.
+        ///
+        /// # Errors
+        ///
+        /// Propagates the policy's own validation errors (bad partitions,
+        /// unknown capability references, invalid Grassmannian).
+        pub fn from_policy(policy: &crate::policy::PolicyConfig) -> Result<Self> {
+            policy.validate()?;
+            let mut entitled: HashMap<PrincipalId, Vec<GrantCapability>> = HashMap::new();
+            for (name, principal) in &policy.principals {
+                let caps = principal
+                    .grants
+                    .iter()
+                    .filter_map(|id| {
+                        policy.capabilities.get(id).map(|c| GrantCapability {
+                            id: CapabilityId::new(id.clone()),
+                            partition: c.partition.clone(),
+                        })
+                    })
+                    .collect();
+                entitled.insert(PrincipalId::new(name.clone()), caps);
+            }
+            Ok(Self { entitled })
+        }
+
+        /// Check an issuance request against the policy.
+        ///
+        /// `Ok(())` iff every requested `(id, partition)` pair is exactly what
+        /// the policy entitles this principal. Fails closed: unknown principals
+        /// and partition mismatches are both denials.
+        ///
+        /// # Errors
+        ///
+        /// [`SchubertError::GrantDeniedByPolicy`] naming the first offending
+        /// capability.
+        pub fn may_issue(
+            &self,
+            principal: &PrincipalId,
+            capabilities: &[(CapabilityId, Vec<usize>)],
+        ) -> Result<()> {
+            let entitled =
+                self.entitled
+                    .get(principal)
+                    .ok_or_else(|| SchubertError::GrantDeniedByPolicy {
+                        principal: principal.to_string(),
+                        capability: capabilities
+                            .first()
+                            .map(|(id, _)| id.to_string())
+                            .unwrap_or_default(),
+                    })?;
+
+            for (id, partition) in capabilities {
+                let ok = entitled
+                    .iter()
+                    .any(|e| &e.id == id && e.partition == *partition);
+                if !ok {
+                    return Err(SchubertError::GrantDeniedByPolicy {
+                        principal: principal.to_string(),
+                        capability: id.to_string(),
+                    });
+                }
+            }
+            Ok(())
+        }
+
+        /// The exact grant pairs this policy entitles the principal to
+        /// (borrowed; empty slice for principals absent from the policy).
+        pub fn grants_for(&self, principal: &PrincipalId) -> &[GrantCapability] {
+            self.entitled
+                .get(principal)
+                .map(|v| v.as_slice())
+                .unwrap_or(&[])
+        }
+    }
+
+    /// Issue a grant constrained by policy (#20.3): check first, then sign.
+    ///
+    /// Composes [`GrantPolicy::may_issue`] with
+    /// [`CapabilityIssuer::issue_grant_with_options`] — the single seam both
+    /// the controller path and raw issuance share. On success the grant is
+    /// policy-entitled, signed, and carries the given options (nonce/expiry,
+    /// ADR-0001).
+    ///
+    /// # Errors
+    ///
+    /// [`SchubertError::GrantDeniedByPolicy`] if the request exceeds the
+    /// entitlement; otherwise the issuer's own errors.
+    pub fn issue_grant_under_policy(
+        issuer: &CapabilityIssuer,
+        policy: &GrantPolicy,
+        principal: impl Into<PrincipalId>,
+        capabilities: &[(CapabilityId, Vec<usize>)],
+        options: GrantOptions,
+    ) -> Result<GrantToken> {
+        let principal = principal.into();
+        policy.may_issue(&principal, capabilities)?;
+        issuer.issue_grant_with_options(principal, capabilities, options)
+    }
+}
+
+#[cfg(all(feature = "crypto", feature = "policy"))]
+pub use policy_issuance::{issue_grant_under_policy, GrantPolicy};
+
 // ---------- partition helpers ----------
 
 /// Returns `true` if `a ≤ b` component-wise, padding shorter sequences with zeros.
@@ -1386,5 +1547,111 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    // --- #20.3: policy -> issuance linkage -------------------------------------
+    #[cfg(all(feature = "crypto", feature = "policy"))]
+    mod policy_link {
+        use super::*;
+        use crate::policy::PolicyConfig;
+
+        const LINK_POLICY_TOML: &str = r#"
+[grassmannian]
+k = 2
+n = 4
+
+[capabilities.read]
+partition = [1]
+kind = "ReadLike"
+label = "Read"
+
+[capabilities.write]
+partition = [2]
+kind = "WriteLike"
+label = "Write"
+
+[principals.alice]
+grants = ["read", "write"]
+
+[principals.bob]
+grants = ["read"]
+"#;
+
+        fn link_policy() -> PolicyConfig {
+            PolicyConfig::from_toml(LINK_POLICY_TOML).unwrap()
+        }
+
+        #[test]
+        fn grant_policy_allows_entitled_issuance() {
+            let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
+            let issuer = CapabilityIssuer::from_seed([21u8; 32]);
+            let caps = vec![grant_cap("read", vec![1]), grant_cap("write", vec![2])];
+
+            policy.may_issue(&PrincipalId::new("alice"), &caps).unwrap();
+
+            let grant =
+                issue_grant_under_policy(&issuer, &policy, "alice", &caps, GrantOptions::default())
+                    .unwrap();
+            GrantVerifier::new(issuer.public_key())
+                .verify(&grant)
+                .unwrap();
+        }
+
+        #[test]
+        fn grant_policy_denies_unentitled_capability() {
+            let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
+            let caps = vec![grant_cap("write", vec![2])];
+            let err = policy
+                .may_issue(&PrincipalId::new("bob"), &caps)
+                .unwrap_err();
+            assert!(matches!(
+                err,
+                SchubertError::GrantDeniedByPolicy {
+                    ref principal,
+                    ref capability
+                } if principal == "bob" && capability == "write"
+            ));
+        }
+
+        #[test]
+        fn grant_policy_denies_unknown_principal() {
+            let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
+            let caps = vec![grant_cap("read", vec![1])];
+            let err = policy
+                .may_issue(&PrincipalId::new("mallory"), &caps)
+                .unwrap_err();
+            assert!(matches!(
+                err,
+                SchubertError::GrantDeniedByPolicy { ref principal, .. } if principal == "mallory"
+            ));
+        }
+
+        #[test]
+        fn grant_policy_denies_partition_mismatch() {
+            let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
+            let caps = vec![grant_cap("read", vec![2])];
+            assert!(policy.may_issue(&PrincipalId::new("alice"), &caps).is_err());
+        }
+
+        #[test]
+        fn issue_under_policy_honors_expiry_options() {
+            let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
+            let issuer = CapabilityIssuer::from_seed([21u8; 32]);
+            let caps = vec![grant_cap("read", vec![1])];
+            let grant = issue_grant_under_policy(
+                &issuer,
+                &policy,
+                "bob",
+                &caps,
+                GrantOptions::with_expiry(1_500_000_000),
+            )
+            .unwrap();
+            let verifier = GrantVerifier::new(issuer.public_key());
+            verifier.verify_at(&grant, 1_000_000).unwrap();
+            assert!(matches!(
+                verifier.verify_at(&grant, 1_500_000_000),
+                Err(SchubertError::GrantExpired { .. })
+            ));
+        }
     }
 }
