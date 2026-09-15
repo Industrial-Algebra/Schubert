@@ -5,7 +5,9 @@
 //!
 //! Run with: `cargo run --example context_aware`
 
-use schubert::{AccessContext, AccessController, Capability, CapabilityKind};
+use schubert::{
+    AccessContext, AccessController, Capability, CapabilityId, CapabilityKind, PrincipalId,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Context-Aware Access Decisions ===\n");
@@ -13,19 +15,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut acl = AccessController::new(2, 4)?;
 
     acl.register_capability(Capability::new(
-        "read",
+        CapabilityId::new("read").expect("valid id"),
         "Read",
         vec![1],
         CapabilityKind::ReadLike,
     ))?;
     acl.register_capability(Capability::new(
-        "write",
+        CapabilityId::new("write").expect("valid id"),
         "Write",
         vec![2],
         CapabilityKind::WriteLike,
     ))?;
     acl.register_capability(Capability::new(
-        "admin",
+        CapabilityId::new("admin").expect("valid id"),
         "Admin",
         vec![2, 2],
         CapabilityKind::AdminLike,
@@ -33,18 +35,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for doc_id in &["doc/42", "doc/99"] {
         acl.register_capability(Capability::new(
-            format!("read/{doc_id}"),
+            CapabilityId::new(format!("read/{doc_id}")).expect("valid id"),
             format!("Read {doc_id}"),
             vec![1],
             CapabilityKind::ReadLike,
         ))?;
     }
 
-    let alice = acl.create_principal("alice")?;
+    let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?;
     acl.grant(&alice, "read")?;
     acl.grant(&alice, "read/doc/42")?;
 
-    let bob = acl.create_principal("bob")?;
+    let bob = acl.create_principal(PrincipalId::new("bob").expect("valid id"))?;
     acl.grant(&bob, "read")?;
 
     println!("=== Resource Scoping ===\n");

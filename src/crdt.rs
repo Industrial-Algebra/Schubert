@@ -19,22 +19,22 @@
 //!
 //! ```
 //! use schubert::crdt::{CrdtState, VersionVector, CrdtGrant};
-//! use schubert::{Capability, CapabilityKind, PrincipalId};
+//! use schubert::{Capability, CapabilityId, CapabilityKind, PrincipalId};
 //!
 //! let mut node_a = CrdtState::new(2, 4)?;
 //! let mut node_b = CrdtState::new(2, 4)?;
 //!
-//! node_a.register_capability(Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike))?;
-//! node_a.register_capability(Capability::new("write", "Write", vec![2], CapabilityKind::WriteLike))?;
-//! node_b.register_capability(Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike))?;
-//! node_b.register_capability(Capability::new("write", "Write", vec![2], CapabilityKind::WriteLike))?;
+//! node_a.register_capability(Capability::new(CapabilityId::new("read").expect("valid id"), "Read", vec![1], CapabilityKind::ReadLike))?;
+//! node_a.register_capability(Capability::new(CapabilityId::new("write").expect("valid id"), "Write", vec![2], CapabilityKind::WriteLike))?;
+//! node_b.register_capability(Capability::new(CapabilityId::new("read").expect("valid id"), "Read", vec![1], CapabilityKind::ReadLike))?;
+//! node_b.register_capability(Capability::new(CapabilityId::new("write").expect("valid id"), "Write", vec![2], CapabilityKind::WriteLike))?;
 //!
-//! node_a.grant("alice", "read", "node_a", 1000)?;
-//! node_b.grant("alice", "write", "node_b", 1000)?;
+//! node_a.grant(PrincipalId::new("alice").expect("valid id"), CapabilityId::new("read").expect("valid id"), "node_a", 1000)?;
+//! node_b.grant(PrincipalId::new("alice").expect("valid id"), CapabilityId::new("write").expect("valid id"), "node_b", 1000)?;
 //!
 //! node_a.merge(&node_b);
-//! assert!(node_a.holds(&PrincipalId::new("alice"), "read"));
-//! assert!(node_a.holds(&PrincipalId::new("alice"), "write"));
+//! assert!(node_a.holds(&PrincipalId::new("alice").expect("valid id"), "read"));
+//! assert!(node_a.holds(&PrincipalId::new("alice").expect("valid id"), "write"));
 //! # Ok::<(), schubert::SchubertError>(())
 //! ```
 
@@ -180,14 +180,11 @@ impl CrdtState {
     /// for tiebreaking when version vectors are concurrent.
     pub fn grant(
         &mut self,
-        principal: impl Into<PrincipalId>,
-        capability: impl Into<CapabilityId>,
+        principal: PrincipalId,
+        capability: CapabilityId,
         node_id: &str,
         timestamp_ms: u64,
     ) -> Result<()> {
-        let principal = principal.into();
-        let capability = capability.into();
-
         if !self.capabilities.contains_key(&capability) {
             return Err(SchubertError::CapabilityNotFound(capability.to_string()));
         }
@@ -218,14 +215,11 @@ impl CrdtState {
     /// Revoke a capability from a principal.
     pub fn revoke(
         &mut self,
-        principal: impl Into<PrincipalId>,
-        capability: impl Into<CapabilityId>,
+        principal: PrincipalId,
+        capability: CapabilityId,
         node_id: &str,
         timestamp_ms: u64,
     ) -> Result<()> {
-        let principal = principal.into();
-        let capability = capability.into();
-
         self.version.increment(node_id);
         let grant = CrdtGrant {
             principal,
@@ -274,7 +268,10 @@ impl CrdtState {
 
     /// Check if a principal holds a capability.
     pub fn holds(&self, principal: &PrincipalId, capability: &str) -> bool {
-        let cid = CapabilityId::new(capability);
+        let cid = match CapabilityId::new(capability) {
+            Ok(cid) => cid,
+            Err(_) => return false,
+        };
         let key = (principal.clone(), cid);
         self.grants.get(&key).is_some_and(|g| g.active)
     }
@@ -384,7 +381,7 @@ mod tests {
         let mut state = CrdtState::new(2, 4).unwrap();
         state
             .register_capability(Capability::new(
-                "read",
+                CapabilityId::new("read").expect("valid id"),
                 "Read",
                 vec![1],
                 CapabilityKind::ReadLike,
@@ -392,7 +389,7 @@ mod tests {
             .unwrap();
         state
             .register_capability(Capability::new(
-                "write",
+                CapabilityId::new("write").expect("valid id"),
                 "Write",
                 vec![2],
                 CapabilityKind::WriteLike,
@@ -427,61 +424,134 @@ mod tests {
     #[test]
     fn grant_and_hold() {
         let mut state = setup();
-        state.grant("alice", "read", "node1", 1000).unwrap();
-        assert!(state.holds(&PrincipalId::new("alice"), "read"));
-        assert!(!state.holds(&PrincipalId::new("alice"), "write"));
+        state
+            .grant(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read").expect("valid id"),
+                "node1",
+                1000,
+            )
+            .unwrap();
+        assert!(state.holds(&PrincipalId::new("alice").expect("valid id"), "read"));
+        assert!(!state.holds(&PrincipalId::new("alice").expect("valid id"), "write"));
     }
 
     #[test]
     fn revoke_and_check() {
         let mut state = setup();
-        state.grant("alice", "read", "node1", 1000).unwrap();
-        state.revoke("alice", "read", "node1", 2000).unwrap();
-        assert!(!state.holds(&PrincipalId::new("alice"), "read"));
+        state
+            .grant(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read").expect("valid id"),
+                "node1",
+                1000,
+            )
+            .unwrap();
+        state
+            .revoke(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read").expect("valid id"),
+                "node1",
+                2000,
+            )
+            .unwrap();
+        assert!(!state.holds(&PrincipalId::new("alice").expect("valid id"), "read"));
     }
 
     #[test]
     fn merge_preserves_both_grants() {
         let mut node_a = setup();
         let mut node_b = setup();
-        node_a.grant("alice", "read", "node_a", 1000).unwrap();
-        node_b.grant("alice", "write", "node_b", 1000).unwrap();
+        node_a
+            .grant(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read").expect("valid id"),
+                "node_a",
+                1000,
+            )
+            .unwrap();
+        node_b
+            .grant(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("write").expect("valid id"),
+                "node_b",
+                1000,
+            )
+            .unwrap();
 
         node_a.merge(&node_b);
-        assert!(node_a.holds(&PrincipalId::new("alice"), "read"));
-        assert!(node_a.holds(&PrincipalId::new("alice"), "write"));
+        assert!(node_a.holds(&PrincipalId::new("alice").expect("valid id"), "read"));
+        assert!(node_a.holds(&PrincipalId::new("alice").expect("valid id"), "write"));
     }
 
     #[test]
     fn merge_last_write_wins() {
         let mut node_a = setup();
         let mut node_b = setup();
-        node_a.grant("alice", "read", "node_a", 1000).unwrap();
-        node_b.revoke("alice", "read", "node_b", 2000).unwrap(); // later timestamp wins
+        node_a
+            .grant(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read").expect("valid id"),
+                "node_a",
+                1000,
+            )
+            .unwrap();
+        node_b
+            .revoke(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read").expect("valid id"),
+                "node_b",
+                2000,
+            )
+            .unwrap(); // later timestamp wins
 
         node_a.merge(&node_b);
-        assert!(!node_a.holds(&PrincipalId::new("alice"), "read"));
+        assert!(!node_a.holds(&PrincipalId::new("alice").expect("valid id"), "read"));
     }
 
     #[test]
     fn merge_idempotent() {
         let mut node_a = setup();
-        node_a.grant("alice", "read", "node_a", 1000).unwrap();
+        node_a
+            .grant(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read").expect("valid id"),
+                "node_a",
+                1000,
+            )
+            .unwrap();
         let snapshot = node_a.clone();
 
         node_a.merge(&snapshot);
         // State should be unchanged
-        assert!(node_a.holds(&PrincipalId::new("alice"), "read"));
+        assert!(node_a.holds(&PrincipalId::new("alice").expect("valid id"), "read"));
     }
 
     #[test]
     fn crdt_check_access() {
         let mut state = setup();
-        state.grant("alice", "read", "node1", 1000).unwrap();
-        state.grant("alice", "write", "node1", 1000).unwrap();
+        state
+            .grant(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read").expect("valid id"),
+                "node1",
+                1000,
+            )
+            .unwrap();
+        state
+            .grant(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("write").expect("valid id"),
+                "node1",
+                1000,
+            )
+            .unwrap();
 
         let result = state
-            .check(&PrincipalId::new("alice"), &["read", "write"])
+            .check(
+                &PrincipalId::new("alice").expect("valid id"),
+                &["read", "write"],
+            )
             .unwrap();
         // σ₁·σ₂ in Gr(2,4) — underconstrained
         assert!(matches!(result, AccessDecision::Underconstrained { .. }));
@@ -522,17 +592,24 @@ mod tests {
         let mut state = CrdtState::new(2, 4).unwrap();
         state
             .register_capability(Capability::new(
-                "read",
+                CapabilityId::new("read").expect("valid id"),
                 "Read",
                 vec![1],
                 CapabilityKind::ReadLike,
             ))
             .unwrap();
-        state.grant("alice", "read", "node-a", 100).unwrap();
+        state
+            .grant(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read").expect("valid id"),
+                "node-a",
+                100,
+            )
+            .unwrap();
         state.revoke_grant([9u8; 16], "node-a", 150).unwrap();
         // A grant tombstone targets one issuance — the (principal, capability)
         // grant is untouched.
-        assert!(state.holds(&PrincipalId::new("alice"), "read"));
+        assert!(state.holds(&PrincipalId::new("alice").expect("valid id"), "read"));
     }
 
     #[test]

@@ -5,10 +5,10 @@
 A Schubert condition with a partition, kind, and label.
 
 ```rust
-use schubert::{Capability, CapabilityKind};
+use schubert::{Capability, CapabilityId, CapabilityKind};
 
 let cap = Capability::new(
-    "read:data",        // unique ID
+    CapabilityId::new("read:data").expect("valid id"),        // unique ID
     "Read data access", // human label
     vec![1],            // partition (Schubert condition)
     CapabilityKind::ReadLike,
@@ -56,8 +56,8 @@ provided by your external auth system.
 ```rust
 use schubert::PrincipalId;
 
-let alice = PrincipalId::new("alice");
-let from_jwt = PrincipalId::new(jwt_claims.sub);
+let alice = PrincipalId::new("alice").expect("valid id");
+let from_jwt = PrincipalId::new(jwt_claims.sub).expect("valid id");
 ```
 
 `PrincipalId` implements `Clone`, `Eq`, `Hash`, `Debug`, and with `serde`:

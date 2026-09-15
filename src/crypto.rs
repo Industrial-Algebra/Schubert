@@ -22,11 +22,12 @@
 //! ```
 //! # #[cfg(feature = "crypto")] {
 //! use schubert::crypto::{CapabilityIssuer, CapabilityVerifier, CapabilityToken};
+//! use schubert::{CapabilityId, PrincipalId};
 //!
 //! let issuer = CapabilityIssuer::generate();
-//! let token = issuer.issue("alice", "read:data")?;
+//! let token = issuer.issue(PrincipalId::new("alice").expect("valid id"), CapabilityId::new("read:data").expect("valid id"))?;
 //!
-//! let verifier = CapabilityVerifier::new(issuer.public_key());
+//! let verifier = CapabilityVerifier::new(issuer.public_key()).expect("valid key");
 //! assert!(verifier.verify(&token).is_ok());
 //! # }
 //! # Ok::<(), schubert::SchubertError>(())
@@ -104,8 +105,8 @@ impl CapabilityToken {
             ));
         }
         Ok(CapabilityToken {
-            principal: PrincipalId::new(principal),
-            capability: CapabilityId::new(capability),
+            principal: PrincipalId::new(principal)?,
+            capability: CapabilityId::new(capability)?,
             issuer_key: issuer_key.to_vec(),
             signature: signature.to_vec(),
         })
@@ -168,11 +169,9 @@ impl CapabilityIssuer {
     /// the issuer's Ed25519 key.
     pub fn issue(
         &self,
-        principal: impl Into<PrincipalId>,
-        capability: impl Into<CapabilityId>,
+        principal: PrincipalId,
+        capability: CapabilityId,
     ) -> Result<CapabilityToken> {
-        let principal = principal.into();
-        let capability = capability.into();
         let key_bytes = self.signing_key.verifying_key().to_bytes();
 
         // Build message: principal || capability || public_key
@@ -196,10 +195,7 @@ impl CapabilityIssuer {
     /// Issue multiple tokens at once.
     pub fn issue_batch(
         &self,
-        grants: &[(
-            impl Into<PrincipalId> + Clone,
-            impl Into<CapabilityId> + Clone,
-        )],
+        grants: &[(PrincipalId, CapabilityId)],
     ) -> Result<Vec<CapabilityToken>> {
         grants
             .iter()
@@ -223,7 +219,7 @@ impl CapabilityIssuer {
     /// `issue_grant_with_options(.., GrantOptions::default())`.
     pub fn issue_grant(
         &self,
-        principal: impl Into<PrincipalId>,
+        principal: PrincipalId,
         capabilities: &[(CapabilityId, Vec<usize>)],
     ) -> Result<GrantToken> {
         self.issue_grant_with_options(principal, capabilities, GrantOptions::default())
@@ -236,7 +232,7 @@ impl CapabilityIssuer {
     /// controller round-trip (ADR-0001). The nonce is random.
     pub fn issue_grant_with_expiry(
         &self,
-        principal: impl Into<PrincipalId>,
+        principal: PrincipalId,
         capabilities: &[(CapabilityId, Vec<usize>)],
         expires_at_unix: u64,
     ) -> Result<GrantToken> {
@@ -253,11 +249,10 @@ impl CapabilityIssuer {
     /// the nonce never participates in the canonical capability sort.
     pub fn issue_grant_with_options(
         &self,
-        principal: impl Into<PrincipalId>,
+        principal: PrincipalId,
         capabilities: &[(CapabilityId, Vec<usize>)],
         options: GrantOptions,
     ) -> Result<GrantToken> {
-        let principal = principal.into();
         let key_bytes = self.signing_key.verifying_key().to_bytes();
 
         let mut entries: Vec<GrantCapability> = capabilities
@@ -309,12 +304,21 @@ pub struct CapabilityVerifier {
 
 impl CapabilityVerifier {
     /// Create a verifier from the issuer's public key bytes.
-    pub fn new(public_key: Vec<u8>) -> Self {
-        let bytes: [u8; 32] = public_key[..32]
-            .try_into()
-            .expect("public key must be 32 bytes");
-        let verifying_key = VerifyingKey::from_bytes(&bytes).expect("invalid Ed25519 public key");
-        Self { verifying_key }
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SchubertError::InvalidVerifyingKey`] if `public_key` is
+    /// not exactly 32 bytes or is not a valid Ed25519 verifying key.
+    pub fn new(public_key: Vec<u8>) -> Result<Self> {
+        let bytes: [u8; 32] = public_key.as_slice().try_into().map_err(|_| {
+            SchubertError::InvalidVerifyingKey(format!(
+                "expected 32 bytes, got {}",
+                public_key.len()
+            ))
+        })?;
+        let verifying_key = VerifyingKey::from_bytes(&bytes)
+            .map_err(|_| SchubertError::InvalidVerifyingKey("invalid Ed25519 public key".into()))?;
+        Ok(Self { verifying_key })
     }
 
     /// Verify a token's signature.
@@ -572,7 +576,7 @@ impl GrantToken {
                     )
                 })?;
             capabilities.push(GrantCapability {
-                id: CapabilityId::new(cap_id),
+                id: CapabilityId::new(cap_id)?,
                 partition,
             });
         }
@@ -601,7 +605,7 @@ impl GrantToken {
             ));
         }
         Ok(GrantToken {
-            principal: PrincipalId::new(principal),
+            principal: PrincipalId::new(principal)?,
             capabilities,
             nonce,
             expires_at,
@@ -622,12 +626,21 @@ pub struct GrantVerifier {
 
 impl GrantVerifier {
     /// Create a verifier from the issuer's public key bytes.
-    pub fn new(public_key: Vec<u8>) -> Self {
-        let bytes: [u8; 32] = public_key[..32]
-            .try_into()
-            .expect("public key must be 32 bytes");
-        let verifying_key = VerifyingKey::from_bytes(&bytes).expect("invalid Ed25519 public key");
-        Self { verifying_key }
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SchubertError::InvalidVerifyingKey`] if `public_key` is
+    /// not exactly 32 bytes or is not a valid Ed25519 verifying key.
+    pub fn new(public_key: Vec<u8>) -> Result<Self> {
+        let bytes: [u8; 32] = public_key.as_slice().try_into().map_err(|_| {
+            SchubertError::InvalidVerifyingKey(format!(
+                "expected 32 bytes, got {}",
+                public_key.len()
+            ))
+        })?;
+        let verifying_key = VerifyingKey::from_bytes(&bytes)
+            .map_err(|_| SchubertError::InvalidVerifyingKey("invalid Ed25519 public key".into()))?;
+        Ok(Self { verifying_key })
     }
 
     /// Verify a grant token: signature first, then expiry (ADR-0001).
@@ -752,6 +765,7 @@ mod policy_issuance {
     ///
     /// ```
     /// # use schubert::crypto::{issue_grant_under_policy, CapabilityIssuer, GrantOptions, GrantPolicy};
+    /// # use schubert::{CapabilityId, PrincipalId};
     /// # use schubert::policy::PolicyConfig;
     /// let policy_toml = r#"
     /// [grassmannian]
@@ -771,8 +785,8 @@ mod policy_issuance {
     ///
     /// // Entitled issuance succeeds and verifies; anything else is denied.
     /// let grant = issue_grant_under_policy(
-    ///     &issuer, &policy, "alice",
-    ///     &[("read".into(), vec![1])],
+    ///     &issuer, &policy, PrincipalId::new("alice").expect("valid id"),
+    ///     &[(CapabilityId::new("read").expect("valid id"), vec![1])],
     ///     GrantOptions::default(),
     /// ).unwrap();
     /// # let _ = grant;
@@ -793,17 +807,16 @@ mod policy_issuance {
             policy.validate()?;
             let mut entitled: HashMap<PrincipalId, Vec<GrantCapability>> = HashMap::new();
             for (name, principal) in &policy.principals {
-                let caps = principal
-                    .grants
-                    .iter()
-                    .filter_map(|id| {
-                        policy.capabilities.get(id).map(|c| GrantCapability {
-                            id: CapabilityId::new(id.clone()),
+                let mut caps = Vec::new();
+                for id in &principal.grants {
+                    if let Some(c) = policy.capabilities.get(id) {
+                        caps.push(GrantCapability {
+                            id: CapabilityId::new(id.clone())?,
                             partition: c.partition.clone(),
-                        })
-                    })
-                    .collect();
-                entitled.insert(PrincipalId::new(name.clone()), caps);
+                        });
+                    }
+                }
+                entitled.insert(PrincipalId::new(name.clone())?, caps);
             }
             Ok(Self { entitled })
         }
@@ -873,11 +886,10 @@ mod policy_issuance {
     pub fn issue_grant_under_policy(
         issuer: &CapabilityIssuer,
         policy: &GrantPolicy,
-        principal: impl Into<PrincipalId>,
+        principal: PrincipalId,
         capabilities: &[(CapabilityId, Vec<usize>)],
         options: GrantOptions,
     ) -> Result<GrantToken> {
-        let principal = principal.into();
         policy.may_issue(&principal, capabilities)?;
         issuer.issue_grant_with_options(principal, capabilities, options)
     }
@@ -1066,9 +1078,14 @@ mod tests {
     #[test]
     fn issue_and_verify() {
         let issuer = CapabilityIssuer::generate();
-        let token = issuer.issue("alice", "read:data").unwrap();
+        let token = issuer
+            .issue(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read:data").expect("valid id"),
+            )
+            .unwrap();
 
-        let verifier = CapabilityVerifier::new(issuer.public_key());
+        let verifier = CapabilityVerifier::new(issuer.public_key()).expect("valid key");
         verifier.verify(&token).unwrap();
     }
 
@@ -1076,41 +1093,61 @@ mod tests {
     fn verify_wrong_key_fails() {
         let issuer1 = CapabilityIssuer::generate();
         let issuer2 = CapabilityIssuer::generate();
-        let token = issuer1.issue("alice", "read:data").unwrap();
+        let token = issuer1
+            .issue(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read:data").expect("valid id"),
+            )
+            .unwrap();
 
-        let wrong_verifier = CapabilityVerifier::new(issuer2.public_key());
+        let wrong_verifier = CapabilityVerifier::new(issuer2.public_key()).expect("valid key");
         assert!(wrong_verifier.verify(&token).is_err());
     }
 
     #[test]
     fn tampered_token_fails() {
         let issuer = CapabilityIssuer::generate();
-        let mut token = issuer.issue("alice", "read:data").unwrap();
+        let mut token = issuer
+            .issue(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read:data").expect("valid id"),
+            )
+            .unwrap();
 
         // Tamper with capability
-        token.capability = CapabilityId::new("write:data");
+        token.capability = CapabilityId::new("write:data").expect("valid id");
 
-        let verifier = CapabilityVerifier::new(issuer.public_key());
+        let verifier = CapabilityVerifier::new(issuer.public_key()).expect("valid key");
         assert!(verifier.verify(&token).is_err());
     }
 
     #[test]
     fn tampered_principal_fails() {
         let issuer = CapabilityIssuer::generate();
-        let mut token = issuer.issue("alice", "read:data").unwrap();
+        let mut token = issuer
+            .issue(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read:data").expect("valid id"),
+            )
+            .unwrap();
 
-        token.principal = PrincipalId::new("bob");
+        token.principal = PrincipalId::new("bob").expect("valid id");
 
-        let verifier = CapabilityVerifier::new(issuer.public_key());
+        let verifier = CapabilityVerifier::new(issuer.public_key()).expect("valid key");
         assert!(verifier.verify(&token).is_err());
     }
 
     #[test]
     fn verify_and_extract() {
         let issuer = CapabilityIssuer::generate();
-        let token = issuer.issue("alice", "read:data").unwrap();
+        let token = issuer
+            .issue(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read:data").expect("valid id"),
+            )
+            .unwrap();
 
-        let verifier = CapabilityVerifier::new(issuer.public_key());
+        let verifier = CapabilityVerifier::new(issuer.public_key()).expect("valid key");
         let (pid, cid) = verifier.verify_and_extract(&token).unwrap();
         assert_eq!(pid.as_str(), "alice");
         assert_eq!(cid.as_str(), "read:data");
@@ -1120,12 +1157,21 @@ mod tests {
     fn issue_batch() {
         let issuer = CapabilityIssuer::generate();
         let tokens = issuer
-            .issue_batch(&[("alice", "read:data"), ("bob", "write:data")])
+            .issue_batch(&[
+                (
+                    PrincipalId::new("alice").expect("valid id"),
+                    CapabilityId::new("read:data").expect("valid id"),
+                ),
+                (
+                    PrincipalId::new("bob").expect("valid id"),
+                    CapabilityId::new("write:data").expect("valid id"),
+                ),
+            ])
             .unwrap();
 
         assert_eq!(tokens.len(), 2);
 
-        let verifier = CapabilityVerifier::new(issuer.public_key());
+        let verifier = CapabilityVerifier::new(issuer.public_key()).expect("valid key");
         for token in &tokens {
             verifier.verify(token).unwrap();
         }
@@ -1136,7 +1182,12 @@ mod tests {
     #[test]
     fn token_to_bytes_roundtrips() {
         let issuer = CapabilityIssuer::generate();
-        let token = issuer.issue("alice", "read:data").unwrap();
+        let token = issuer
+            .issue(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read:data").expect("valid id"),
+            )
+            .unwrap();
 
         let bytes = CapabilityToken::to_bytes(&token);
         let decoded = CapabilityToken::from_bytes(&bytes).unwrap();
@@ -1155,7 +1206,12 @@ mod tests {
     #[test]
     fn token_from_bytes_rejects_truncated() {
         let issuer = CapabilityIssuer::generate();
-        let token = issuer.issue("alice", "read:data").unwrap();
+        let token = issuer
+            .issue(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read:data").expect("valid id"),
+            )
+            .unwrap();
         let bytes = CapabilityToken::to_bytes(&token);
         // Truncate last byte
         assert!(CapabilityToken::from_bytes(&bytes[..bytes.len() - 1]).is_err());
@@ -1175,9 +1231,14 @@ mod tests {
     fn issuer_from_seed_produces_usable_keys() {
         let seed = [7u8; 32];
         let issuer = CapabilityIssuer::from_seed(seed);
-        let token = issuer.issue("alice", "read:data").unwrap();
+        let token = issuer
+            .issue(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read:data").expect("valid id"),
+            )
+            .unwrap();
 
-        let verifier = CapabilityVerifier::new(issuer.public_key());
+        let verifier = CapabilityVerifier::new(issuer.public_key()).expect("valid key");
         verifier.verify(&token).unwrap();
     }
 
@@ -1204,7 +1265,7 @@ mod tests {
     // --- #16.4: Multi-capability grant tokens ---
 
     fn grant_cap(id: &str, partition: Vec<usize>) -> (CapabilityId, Vec<usize>) {
-        (CapabilityId::new(id), partition)
+        (CapabilityId::new(id).expect("valid id"), partition)
     }
 
     #[test]
@@ -1212,7 +1273,7 @@ mod tests {
         let issuer = CapabilityIssuer::generate();
         let grant = issuer
             .issue_grant(
-                "alice",
+                PrincipalId::new("alice").expect("valid id"),
                 &[
                     grant_cap("memory:read", vec![1]),
                     grant_cap("memory:write", vec![2]),
@@ -1220,7 +1281,7 @@ mod tests {
             )
             .unwrap();
 
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
         verifier.verify(&grant).unwrap();
     }
 
@@ -1228,10 +1289,13 @@ mod tests {
     fn grant_may_single_cap() {
         let issuer = CapabilityIssuer::generate();
         let grant = issuer
-            .issue_grant("alice", &[grant_cap("memory:read", vec![1])])
+            .issue_grant(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("memory:read", vec![1])],
+            )
             .unwrap();
 
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
         assert!(verifier.may(&grant, &[1]));
         assert!(!verifier.may(&grant, &[2]));
     }
@@ -1241,10 +1305,13 @@ mod tests {
         // Geometric containment: σ₂ ≥ σ₁ component-wise, so write implies read.
         let issuer = CapabilityIssuer::generate();
         let grant = issuer
-            .issue_grant("alice", &[grant_cap("memory:write", vec![2])])
+            .issue_grant(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("memory:write", vec![2])],
+            )
             .unwrap();
 
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
         assert!(verifier.may(&grant, &[1])); // read implied by write
         assert!(verifier.may(&grant, &[2])); // write explicitly granted
         assert!(!verifier.may(&grant, &[2, 1])); // manage not granted
@@ -1255,10 +1322,13 @@ mod tests {
         // σ₄₄₄₄ is the maximum partition — everything ≤ it component-wise.
         let issuer = CapabilityIssuer::generate();
         let grant = issuer
-            .issue_grant("alice", &[grant_cap("admin", vec![4, 4, 4, 4])])
+            .issue_grant(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("admin", vec![4, 4, 4, 4])],
+            )
             .unwrap();
 
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
         assert!(verifier.may(&grant, &[1]));
         assert!(verifier.may(&grant, &[2]));
         assert!(verifier.may(&grant, &[3, 1]));
@@ -1270,7 +1340,7 @@ mod tests {
         let issuer = CapabilityIssuer::generate();
         let grant = issuer
             .issue_grant(
-                "alice",
+                PrincipalId::new("alice").expect("valid id"),
                 &[
                     grant_cap("memory:read", vec![1]),
                     grant_cap("memory:write", vec![2]),
@@ -1289,15 +1359,18 @@ mod tests {
     fn grant_tampered_caps_fails_verify() {
         let issuer = CapabilityIssuer::generate();
         let mut grant = issuer
-            .issue_grant("alice", &[grant_cap("memory:read", vec![1])])
+            .issue_grant(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("memory:read", vec![1])],
+            )
             .unwrap();
 
         grant.capabilities.push(GrantCapability {
-            id: CapabilityId::new("memory:write"),
+            id: CapabilityId::new("memory:write").expect("valid id"),
             partition: vec![2],
         });
 
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
         assert!(verifier.verify(&grant).is_err());
     }
 
@@ -1306,15 +1379,23 @@ mod tests {
         let seed = [99u8; 32];
         let issuer = CapabilityIssuer::from_seed(seed);
 
-        let single = issuer.issue("alice", "read:data").unwrap();
+        let single = issuer
+            .issue(
+                PrincipalId::new("alice").expect("valid id"),
+                CapabilityId::new("read:data").expect("valid id"),
+            )
+            .unwrap();
         let grant = issuer
-            .issue_grant("alice", &[grant_cap("read:data", vec![1])])
+            .issue_grant(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("read:data", vec![1])],
+            )
             .unwrap();
 
         // Both verify cryptographically
-        let verifier = CapabilityVerifier::new(issuer.public_key());
+        let verifier = CapabilityVerifier::new(issuer.public_key()).expect("valid key");
         verifier.verify(&single).unwrap();
-        let gv = GrantVerifier::new(issuer.public_key());
+        let gv = GrantVerifier::new(issuer.public_key()).expect("valid key");
         gv.verify(&grant).unwrap();
 
         // Grant may() with original partition should pass
@@ -1325,7 +1406,16 @@ mod tests {
     fn grant_issue_batch_still_works() {
         let issuer = CapabilityIssuer::generate();
         let tokens = issuer
-            .issue_batch(&[("alice", "read:data"), ("bob", "write:data")])
+            .issue_batch(&[
+                (
+                    PrincipalId::new("alice").expect("valid id"),
+                    CapabilityId::new("read:data").expect("valid id"),
+                ),
+                (
+                    PrincipalId::new("bob").expect("valid id"),
+                    CapabilityId::new("write:data").expect("valid id"),
+                ),
+            ])
             .unwrap();
         assert_eq!(tokens.len(), 2);
     }
@@ -1336,9 +1426,13 @@ mod tests {
     fn grant_expiry_future_verifies() {
         let issuer = CapabilityIssuer::from_seed([7u8; 32]);
         let grant = issuer
-            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], 2_000_000)
+            .issue_grant_with_expiry(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("read", vec![1])],
+                2_000_000,
+            )
             .unwrap();
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
         assert!(verifier.verify_at(&grant, 1_000_000).is_ok());
     }
 
@@ -1346,9 +1440,13 @@ mod tests {
     fn grant_expiry_past_rejected() {
         let issuer = CapabilityIssuer::from_seed([7u8; 32]);
         let grant = issuer
-            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], 1_000_000)
+            .issue_grant_with_expiry(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("read", vec![1])],
+                1_000_000,
+            )
             .unwrap();
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
         let err = verifier.verify_at(&grant, 2_000_000).unwrap_err();
         assert!(matches!(
             err,
@@ -1363,9 +1461,13 @@ mod tests {
     fn grant_expiry_boundary_is_inclusive() {
         let issuer = CapabilityIssuer::from_seed([7u8; 32]);
         let grant = issuer
-            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], 1_000_000)
+            .issue_grant_with_expiry(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("read", vec![1])],
+                1_000_000,
+            )
             .unwrap();
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
         // Alive one second before the boundary, dead *at* it.
         assert!(verifier.verify_at(&grant, 999_999).is_ok());
         assert!(verifier.verify_at(&grant, 1_000_000).is_err());
@@ -1375,19 +1477,26 @@ mod tests {
     fn grant_without_expiry_never_expires() {
         let issuer = CapabilityIssuer::from_seed([7u8; 32]);
         let grant = issuer
-            .issue_grant("alice", &[grant_cap("read", vec![1])])
+            .issue_grant(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("read", vec![1])],
+            )
             .unwrap();
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
         assert!(verifier.verify_at(&grant, u64::MAX).is_ok());
     }
 
     #[test]
     fn verify_wall_clock_checks_expiry() {
         let issuer = CapabilityIssuer::from_seed([7u8; 32]);
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
 
         let dead = issuer
-            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], 1)
+            .issue_grant_with_expiry(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("read", vec![1])],
+                1,
+            )
             .unwrap();
         assert!(matches!(
             verifier.verify(&dead),
@@ -1395,7 +1504,11 @@ mod tests {
         ));
 
         let alive = issuer
-            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], u64::MAX)
+            .issue_grant_with_expiry(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("read", vec![1])],
+                u64::MAX,
+            )
             .unwrap();
         assert!(verifier.verify(&alive).is_ok());
     }
@@ -1404,15 +1517,21 @@ mod tests {
     fn grant_nonce_makes_issues_distinct() {
         let issuer = CapabilityIssuer::from_seed([7u8; 32]);
         let a = issuer
-            .issue_grant("alice", &[grant_cap("read", vec![1])])
+            .issue_grant(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("read", vec![1])],
+            )
             .unwrap();
         let b = issuer
-            .issue_grant("alice", &[grant_cap("read", vec![1])])
+            .issue_grant(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("read", vec![1])],
+            )
             .unwrap();
         assert_ne!(a.nonce, b.nonce);
         assert_ne!(GrantToken::to_bytes(&a), GrantToken::to_bytes(&b));
 
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
         assert!(verifier.verify(&a).is_ok());
         assert!(verifier.verify(&b).is_ok());
     }
@@ -1422,14 +1541,14 @@ mod tests {
         let issuer = CapabilityIssuer::from_seed([7u8; 32]);
         let a = issuer
             .issue_grant_with_options(
-                "alice",
+                PrincipalId::new("alice").expect("valid id"),
                 &[grant_cap("read", vec![1])],
                 GrantOptions::with_nonce([9u8; 16]),
             )
             .unwrap();
         let b = issuer
             .issue_grant_with_options(
-                "alice",
+                PrincipalId::new("alice").expect("valid id"),
                 &[grant_cap("read", vec![1])],
                 GrantOptions::with_nonce([9u8; 16]),
             )
@@ -1440,9 +1559,13 @@ mod tests {
     #[test]
     fn grant_tamper_nonce_or_expiry_breaks_signature() {
         let issuer = CapabilityIssuer::from_seed([7u8; 32]);
-        let verifier = GrantVerifier::new(issuer.public_key());
+        let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
         let grant = issuer
-            .issue_grant_with_expiry("alice", &[grant_cap("read", vec![1])], 2_000_000)
+            .issue_grant_with_expiry(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("read", vec![1])],
+                2_000_000,
+            )
             .unwrap();
 
         // Flip a nonce byte -> signature failure (signature checked before expiry).
@@ -1464,13 +1587,13 @@ mod tests {
         let issuer = CapabilityIssuer::from_seed([7u8; 32]);
         let a = issuer
             .issue_grant(
-                "alice",
+                PrincipalId::new("alice").expect("valid id"),
                 &[grant_cap("write", vec![2]), grant_cap("read", vec![1])],
             )
             .unwrap();
         let b = issuer
             .issue_grant(
-                "alice",
+                PrincipalId::new("alice").expect("valid id"),
                 &[grant_cap("read", vec![1]), grant_cap("write", vec![2])],
             )
             .unwrap();
@@ -1483,7 +1606,7 @@ mod tests {
         let nonce = [4u8; 16];
         let grant = issuer
             .issue_grant_with_options(
-                "alice",
+                PrincipalId::new("alice").expect("valid id"),
                 &[
                     grant_cap("read", vec![1]),
                     grant_cap("admin", vec![4, 4, 4, 4]),
@@ -1549,6 +1672,77 @@ mod tests {
         dir
     }
 
+    // --- A2/A4: constructor rigor ---
+
+    #[test]
+    fn grant_verifier_rejects_wrong_length_key() {
+        assert!(matches!(
+            GrantVerifier::new(vec![0u8; 31]),
+            Err(SchubertError::InvalidVerifyingKey(_))
+        ));
+        assert!(matches!(
+            GrantVerifier::new(vec![0u8; 33]),
+            Err(SchubertError::InvalidVerifyingKey(_))
+        ));
+    }
+
+    #[test]
+    fn grant_verifier_accepts_32_byte_key() {
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let bytes = signing_key.verifying_key().as_bytes().to_vec();
+        assert!(GrantVerifier::new(bytes).is_ok());
+    }
+
+    #[test]
+    fn capability_verifier_rejects_wrong_length_key() {
+        assert!(matches!(
+            CapabilityVerifier::new(vec![0u8; 31]),
+            Err(SchubertError::InvalidVerifyingKey(_))
+        ));
+        assert!(matches!(
+            CapabilityVerifier::new(vec![0u8; 33]),
+            Err(SchubertError::InvalidVerifyingKey(_))
+        ));
+    }
+
+    #[test]
+    fn capability_verifier_accepts_32_byte_key() {
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let bytes = signing_key.verifying_key().as_bytes().to_vec();
+        assert!(CapabilityVerifier::new(bytes).is_ok());
+    }
+
+    #[test]
+    fn verifier_constructors_do_not_panic_on_short_input() {
+        assert!(CapabilityVerifier::new(vec![0u8; 8]).is_err());
+        assert!(GrantVerifier::new(vec![0u8; 8]).is_err());
+    }
+
+    #[test]
+    fn grant_wire_decode_rejects_embedded_nul_principal() {
+        let issuer = CapabilityIssuer::generate();
+        let grant = issuer
+            .issue_grant(
+                PrincipalId::new("alice").expect("valid id"),
+                &[grant_cap("read", vec![1])],
+            )
+            .unwrap();
+        let mut bytes = GrantToken::to_bytes(&grant);
+
+        // Wire layout: u16 BE principal_len | principal utf-8 | ...
+        let plen = u16::from_be_bytes([bytes[0], bytes[1]]) as usize;
+        assert_eq!(plen, 5);
+        // Splice a NUL into the principal bytes and grow the length prefix so
+        // the remainder of the stream stays aligned.
+        bytes.insert(2 + 1, 0u8);
+        bytes[0..2].copy_from_slice(&((plen + 1) as u16).to_be_bytes());
+
+        assert!(matches!(
+            GrantToken::from_bytes(&bytes),
+            Err(SchubertError::InvalidPrincipalId(_))
+        ));
+    }
+
     // --- #20.3: policy -> issuance linkage -------------------------------------
     #[cfg(all(feature = "crypto", feature = "policy"))]
     mod policy_link {
@@ -1587,12 +1781,20 @@ grants = ["read"]
             let issuer = CapabilityIssuer::from_seed([21u8; 32]);
             let caps = vec![grant_cap("read", vec![1]), grant_cap("write", vec![2])];
 
-            policy.may_issue(&PrincipalId::new("alice"), &caps).unwrap();
+            policy
+                .may_issue(&PrincipalId::new("alice").expect("valid id"), &caps)
+                .unwrap();
 
-            let grant =
-                issue_grant_under_policy(&issuer, &policy, "alice", &caps, GrantOptions::default())
-                    .unwrap();
+            let grant = issue_grant_under_policy(
+                &issuer,
+                &policy,
+                PrincipalId::new("alice").expect("valid id"),
+                &caps,
+                GrantOptions::default(),
+            )
+            .unwrap();
             GrantVerifier::new(issuer.public_key())
+                .expect("valid key")
                 .verify(&grant)
                 .unwrap();
         }
@@ -1602,7 +1804,7 @@ grants = ["read"]
             let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
             let caps = vec![grant_cap("write", vec![2])];
             let err = policy
-                .may_issue(&PrincipalId::new("bob"), &caps)
+                .may_issue(&PrincipalId::new("bob").expect("valid id"), &caps)
                 .unwrap_err();
             assert!(matches!(
                 err,
@@ -1618,7 +1820,7 @@ grants = ["read"]
             let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
             let caps = vec![grant_cap("read", vec![1])];
             let err = policy
-                .may_issue(&PrincipalId::new("mallory"), &caps)
+                .may_issue(&PrincipalId::new("mallory").expect("valid id"), &caps)
                 .unwrap_err();
             assert!(matches!(
                 err,
@@ -1630,7 +1832,9 @@ grants = ["read"]
         fn grant_policy_denies_partition_mismatch() {
             let policy = GrantPolicy::from_policy(&link_policy()).unwrap();
             let caps = vec![grant_cap("read", vec![2])];
-            assert!(policy.may_issue(&PrincipalId::new("alice"), &caps).is_err());
+            assert!(policy
+                .may_issue(&PrincipalId::new("alice").expect("valid id"), &caps)
+                .is_err());
         }
 
         #[test]
@@ -1641,12 +1845,12 @@ grants = ["read"]
             let grant = issue_grant_under_policy(
                 &issuer,
                 &policy,
-                "bob",
+                PrincipalId::new("bob").expect("valid id"),
                 &caps,
                 GrantOptions::with_expiry(1_500_000_000),
             )
             .unwrap();
-            let verifier = GrantVerifier::new(issuer.public_key());
+            let verifier = GrantVerifier::new(issuer.public_key()).expect("valid key");
             verifier.verify_at(&grant, 1_000_000).unwrap();
             assert!(matches!(
                 verifier.verify_at(&grant, 1_500_000_000),

@@ -39,10 +39,10 @@ use schubert::{AccessController, Capability, CapabilityKind, AccessDecision};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut acl = AccessController::new(2, 4)?;
-    acl.register_capability(Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike))?;
-    acl.register_capability(Capability::new("write", "Write", vec![2], CapabilityKind::WriteLike))?;
+    acl.register_capability(Capability::new(CapabilityId::new("read").expect("valid id"), "Read", vec![1], CapabilityKind::ReadLike))?;
+    acl.register_capability(Capability::new(CapabilityId::new("write").expect("valid id"), "Write", vec![2], CapabilityKind::WriteLike))?;
 
-    let alice = acl.create_principal("alice")?;
+    let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?;
     acl.grant(&alice, "read")?;
     acl.grant(&alice, "write")?;
 

@@ -54,7 +54,7 @@ let mut mc = MultiController::new();
 let rbac = mc.add_domain(2, 4)?;     // RBAC domain
 let tenant = mc.add_domain(3, 6)?;   // Multi-tenant domain
 
-mc.create_principal("alice", &rbac)?;
+mc.create_principal(PrincipalId::new("alice").expect("valid id"), &rbac)?;
 mc.grant_in_domain(&alice, "read", &rbac)?;
 
 // Check if an RBAC capability works in the tenant domain:

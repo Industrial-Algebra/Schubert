@@ -6,55 +6,57 @@
 //! Demonstrates geometrically incompatible scope combinations that
 //! traditional boolean AND checks would silently approve.
 
-use schubert::{AccessController, AccessDecision, Capability, CapabilityKind};
+use schubert::{
+    AccessController, AccessDecision, Capability, CapabilityId, CapabilityKind, PrincipalId,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut acl = AccessController::new(2, 4)?;
 
     acl.register_capability(Capability::new(
-        "read:profile",
+        CapabilityId::new("read:profile").expect("valid id"),
         "Read profile",
         vec![1],
         CapabilityKind::ReadLike,
     ))?;
     acl.register_capability(Capability::new(
-        "read:email",
+        CapabilityId::new("read:email").expect("valid id"),
         "Read email",
         vec![1],
         CapabilityKind::ReadLike,
     ))?;
     acl.register_capability(Capability::new(
-        "write:posts",
+        CapabilityId::new("write:posts").expect("valid id"),
         "Write posts",
         vec![2],
         CapabilityKind::WriteLike,
     ))?;
     acl.register_capability(Capability::new(
-        "admin:users",
+        CapabilityId::new("admin:users").expect("valid id"),
         "Admin users",
         vec![2, 1],
         CapabilityKind::AdminLike,
     ))?;
     // σ₁₁ — geometrically incompatible with σ₂ in Gr(2,4)
     acl.register_capability(Capability::new(
-        "restricted:internal",
+        CapabilityId::new("restricted:internal").expect("valid id"),
         "Internal only",
         vec![1, 1],
         CapabilityKind::WriteLike,
     ))?;
 
-    let user = acl.create_principal("user_token")?;
+    let user = acl.create_principal(PrincipalId::new("user_token").expect("valid id"))?;
     acl.grant(&user, "read:profile")?;
     acl.grant(&user, "read:email")?;
 
-    let power = acl.create_principal("power_token")?;
+    let power = acl.create_principal(PrincipalId::new("power_token").expect("valid id"))?;
     acl.grant(&power, "read:profile")?;
     acl.grant(&power, "write:posts")?;
 
-    let admin = acl.create_principal("admin_token")?;
+    let admin = acl.create_principal(PrincipalId::new("admin_token").expect("valid id"))?;
     acl.grant(&admin, "admin:users")?;
 
-    let bad = acl.create_principal("bad_token")?;
+    let bad = acl.create_principal(PrincipalId::new("bad_token").expect("valid id"))?;
     acl.grant(&bad, "write:posts")?; // σ₂
     acl.grant(&bad, "restricted:internal")?; // σ₁₁ — conflicts!
 

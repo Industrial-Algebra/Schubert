@@ -25,21 +25,21 @@
 //! ## Quick Start
 //!
 //! ```
-//! use schubert::{AccessController, Capability, CapabilityKind, AccessDecision};
+//! use schubert::{AccessController, Capability, CapabilityId, CapabilityKind, PrincipalId, AccessDecision};
 //!
 //! // Create an access controller for Gr(2,4) — 4-dimensional policy space
 //! let mut acl = AccessController::new(2, 4)?;
 //!
 //! // Register capabilities (Schubert conditions)
 //! acl.register_capability(Capability::new(
-//!     "read:data", "Read data", vec![1], CapabilityKind::ReadLike,
+//!     CapabilityId::new("read:data").expect("valid id"), "Read data", vec![1], CapabilityKind::ReadLike,
 //! ))?;
 //! acl.register_capability(Capability::new(
-//!     "write:data", "Write data", vec![2], CapabilityKind::WriteLike,
+//!     CapabilityId::new("write:data").expect("valid id"), "Write data", vec![2], CapabilityKind::WriteLike,
 //! ))?;
 //!
 //! // Create a principal and grant capabilities
-//! let alice = acl.create_principal("alice")?;
+//! let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?;
 //! acl.grant(&alice, "read:data")?;
 //! acl.grant(&alice, "write:data")?;
 //!

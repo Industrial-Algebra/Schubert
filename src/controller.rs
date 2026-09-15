@@ -98,7 +98,8 @@ impl AccessController {
 
     /// Look up a registered capability by its string ID.
     pub fn capability(&self, id: &str) -> Option<&Capability> {
-        self.capabilities.get(&CapabilityId::new(id))
+        let id = CapabilityId::new(id).ok()?;
+        self.capabilities.get(&id)
     }
 
     /// Iterate over all registered capabilities.
@@ -108,7 +109,8 @@ impl AccessController {
 
     /// Look up the registered metadata for an amari CapabilityId.
     fn registered(&self, id: &amari_enumerative::CapabilityId) -> Option<&Capability> {
-        self.capabilities.get(&CapabilityId::new(id.as_str()))
+        let id = CapabilityId::new(id.as_str()).ok()?;
+        self.capabilities.get(&id)
     }
 
     // ── Principal management ───────────────────────────────────────
@@ -117,8 +119,7 @@ impl AccessController {
     ///
     /// The principal starts at the identity position (empty partition) —
     /// the least restrictive position possible in the Grassmannian.
-    pub fn create_principal(&mut self, id: impl Into<PrincipalId>) -> Result<PrincipalId> {
-        let id = id.into();
+    pub fn create_principal(&mut self, id: PrincipalId) -> Result<PrincipalId> {
         if self.principals.contains_key(&id) {
             return Err(SchubertError::PrincipalExists(id.to_string()));
         }
@@ -129,9 +130,10 @@ impl AccessController {
 
     /// Grant a registered capability to a principal.
     pub fn grant(&mut self, principal_id: &PrincipalId, capability_id: &str) -> Result<()> {
+        let capability_id = CapabilityId::new(capability_id)?;
         let our_cap = self
             .capabilities
-            .get(&CapabilityId::new(capability_id))
+            .get(&capability_id)
             .ok_or_else(|| SchubertError::CapabilityNotFound(capability_id.to_string()))?
             .clone();
 
@@ -240,11 +242,11 @@ impl AccessController {
     /// # Example
     ///
     /// ```
-    /// # use schubert::{AccessController, AccessDecision, Capability, CapabilityKind};
+    /// # use schubert::{AccessController, AccessDecision, Capability, CapabilityId, CapabilityKind, PrincipalId};
     ///
     /// let mut acl = AccessController::new(2, 4)?;
-    /// acl.register_capability(Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike))?;
-    /// let alice = acl.create_principal("alice")?;
+    /// acl.register_capability(Capability::new(CapabilityId::new("read").expect("valid id"), "Read", vec![1], CapabilityKind::ReadLike))?;
+    /// let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?;
     /// acl.grant(&alice, "read")?;
     ///
     /// let decision = acl.check_single(&alice, "read")?;
@@ -321,7 +323,10 @@ impl AccessController {
         if let Some(ref sink) = self.audit_sink {
             let _ = sink.record(&crate::audit::DecisionRecord {
                 principal: principal_id.clone(),
-                capabilities: required.iter().map(|s| CapabilityId::new(*s)).collect(),
+                capabilities: required
+                    .iter()
+                    .map(|s| CapabilityId::new(*s))
+                    .collect::<Result<Vec<_>>>()?,
                 decision: decision.clone(),
                 timestamp: crate::principal::now_millis(),
             });
@@ -382,7 +387,7 @@ impl AccessController {
             for cap in required {
                 let scoped = format!("{cap}/{resource}");
                 // Only add if the scoped capability is registered and held
-                let cid = CapabilityId::new(&scoped);
+                let cid = CapabilityId::new(&scoped)?;
                 if self.capabilities.contains_key(&cid) {
                     let principal = self.principals.get(principal_id).ok_or_else(|| {
                         SchubertError::PrincipalNotFound(principal_id.to_string())
@@ -413,7 +418,10 @@ impl AccessController {
                     let adjusted = (*configurations as f64 * trust_factor).ceil() as u64;
                     if adjusted == 0 {
                         decision = AccessDecision::Impossible {
-                            conflicting: required.iter().map(|s| CapabilityId::new(*s)).collect(),
+                            conflicting: required
+                                .iter()
+                                .map(|s| CapabilityId::new(*s))
+                                .collect::<Result<Vec<_>>>()?,
                         };
                     } else {
                         *configurations = adjusted;
@@ -470,7 +478,7 @@ impl AccessController {
                 return Ok(AccessDecision::Denied);
             }
             // Check if the capability has expired
-            let cid = CapabilityId::new(*cap_id);
+            let cid = CapabilityId::new(*cap_id)?;
             if let Some(cap) = self.capabilities.get(&cid) {
                 if cap.is_expired_at(now_ms) {
                     return Ok(AccessDecision::Denied);
@@ -501,9 +509,9 @@ impl AccessController {
             .granted_capability_ids
             .iter()
             .filter(|cap_id| {
-                let cid = CapabilityId::new(cap_id.as_str());
-                self.capabilities
-                    .get(&cid)
+                CapabilityId::new(cap_id.as_str())
+                    .ok()
+                    .and_then(|cid| self.capabilities.get(&cid))
                     .is_some_and(|cap| cap.is_expired_at(now_ms))
             })
             .cloned()
@@ -528,10 +536,9 @@ impl AccessController {
             .granted_capability_ids
             .iter()
             .map(|cap_id| {
-                let cid = CapabilityId::new(cap_id.as_str());
-                let remaining = self
-                    .capabilities
-                    .get(&cid)
+                let remaining = CapabilityId::new(cap_id.as_str())
+                    .ok()
+                    .and_then(|cid| self.capabilities.get(&cid))
                     .and_then(|cap| cap.time_remaining_at(now_ms));
                 (cap_id.clone(), remaining)
             })
@@ -548,7 +555,7 @@ impl AccessController {
         capability_id: &str,
         now_ms: u64,
     ) -> Result<crate::TrustLevel> {
-        let cid = CapabilityId::new(capability_id);
+        let cid = CapabilityId::new(capability_id)?;
         let cap = self
             .capabilities
             .get(&cid)
@@ -579,7 +586,7 @@ impl AccessController {
     ) -> Result<Vec<amari_enumerative::SchubertClass>> {
         let mut classes = Vec::with_capacity(required.len());
         for cap_id_str in required {
-            let cid = CapabilityId::new(*cap_id_str);
+            let cid = CapabilityId::new(*cap_id_str)?;
             let cap = self
                 .capabilities
                 .get(&cid)
@@ -674,7 +681,10 @@ impl AccessController {
             let card = matroid.intersection_cardinality(&other);
             if card == 0 {
                 return Ok(AccessDecision::Impossible {
-                    conflicting: required.iter().map(|s| CapabilityId::new(*s)).collect(),
+                    conflicting: required
+                        .iter()
+                        .map(|s| CapabilityId::new(*s))
+                        .collect::<Result<Vec<_>>>()?,
                 });
             }
             matroid = other;
@@ -689,7 +699,10 @@ impl AccessController {
             // Transverse — but we don't know the exact count from matroids alone
             // Return a marker; caller should verify with LR or localization
             Ok(AccessDecision::Impossible {
-                conflicting: required.iter().map(|s| CapabilityId::new(*s)).collect(),
+                conflicting: required
+                    .iter()
+                    .map(|s| CapabilityId::new(*s))
+                    .collect::<Result<Vec<_>>>()?,
             })
         } else {
             Ok(AccessDecision::Underconstrained {
@@ -747,7 +760,13 @@ impl AccessController {
             // Resolve required capabilities to Schubert classes
             let mut classes = Vec::with_capacity(required.len());
             for cap_id_str in required {
-                let cid = CapabilityId::new(*cap_id_str);
+                let cid = match CapabilityId::new(*cap_id_str) {
+                    Ok(cid) => cid,
+                    Err(_) => {
+                        classes = vec![];
+                        break;
+                    }
+                };
                 match self.capabilities.get(&cid) {
                     Some(cap) => match cap.to_schubert_class(self.grassmannian) {
                         Ok(cls) => classes.push(cls),
@@ -787,7 +806,11 @@ impl AccessController {
             for (q, result) in valid.into_iter().zip(batch_results) {
                 let decision = match result {
                     IntersectionResult::Finite(0) => AccessDecision::Impossible {
-                        conflicting: q.required_strs.into_iter().map(CapabilityId::new).collect(),
+                        conflicting: q
+                            .required_strs
+                            .into_iter()
+                            .filter_map(|s| CapabilityId::new(s).ok())
+                            .collect(),
                     },
                     IntersectionResult::Finite(n) => AccessDecision::Granted {
                         configurations: n,
@@ -900,7 +923,7 @@ impl AccessController {
             for cap_id_str in &grant_ids {
                 let our_cap = self
                     .capabilities
-                    .get(&CapabilityId::new(cap_id_str.as_str()))
+                    .get(&CapabilityId::new(cap_id_str.as_str())?)
                     .ok_or_else(|| SchubertError::CapabilityNotFound(cap_id_str.to_string()))?
                     .clone();
 
@@ -1019,7 +1042,10 @@ pub(crate) fn map_intersection_result(
 ) -> AccessDecision {
     match result {
         IntersectionResult::Finite(0) => AccessDecision::Impossible {
-            conflicting: required.iter().map(|s| CapabilityId::new(*s)).collect(),
+            conflicting: required
+                .iter()
+                .filter_map(|s| CapabilityId::new(*s).ok())
+                .collect(),
         },
         IntersectionResult::Finite(n) => AccessDecision::Granted {
             configurations: n,
@@ -1119,8 +1145,13 @@ mod tests {
             ("sigma21", vec![2, 1], CapabilityKind::AdminLike),
             ("sigma22", vec![2, 2], CapabilityKind::AdminLike),
         ] {
-            acl.register_capability(Capability::new(id, id, partition, kind))
-                .unwrap();
+            acl.register_capability(Capability::new(
+                CapabilityId::new(id).expect("valid id"),
+                id,
+                partition,
+                kind,
+            ))
+            .unwrap();
         }
         acl
     }
@@ -1128,7 +1159,9 @@ mod tests {
     #[test]
     fn sigma1_fourth_equals_2() {
         let mut acl = make_controller();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         for cap in &["sigma1_0", "sigma1_1", "sigma1_2", "sigma1_3"] {
             acl.grant(&p, cap).unwrap();
         }
@@ -1148,7 +1181,9 @@ mod tests {
     #[test]
     fn sigma2_sigma11_is_impossible() {
         let mut acl = make_controller();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma2_0").unwrap();
         acl.grant(&p, "sigma11").unwrap();
         let decision = acl.check(&p, &["sigma2_0", "sigma11"]).unwrap();
@@ -1161,7 +1196,9 @@ mod tests {
     #[test]
     fn overconstrained_is_denied() {
         let mut acl = make_controller();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma2_0").unwrap();
         acl.grant(&p, "sigma21").unwrap();
         acl.grant(&p, "sigma22").unwrap();
@@ -1172,14 +1209,19 @@ mod tests {
     #[test]
     fn create_principal_twice_fails() {
         let mut acl = make_controller();
-        acl.create_principal("alice").unwrap();
-        assert!(acl.create_principal("alice").is_err());
+        acl.create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        assert!(acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .is_err());
     }
 
     #[test]
     fn revoke_removes_capability() {
         let mut acl = make_controller();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma1_0").unwrap();
         assert!(acl.principal(&p).unwrap().holds("sigma1_0"));
         acl.revoke(&p, "sigma1_0").unwrap();
@@ -1189,7 +1231,9 @@ mod tests {
     #[test]
     fn principal_capabilities_returns_in_order() {
         let mut acl = make_controller();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma1_0").unwrap();
         acl.grant(&p, "sigma2_0").unwrap();
         acl.grant(&p, "sigma11").unwrap();
@@ -1213,8 +1257,13 @@ mod tests {
             ("sigma2", vec![2], CapabilityKind::WriteLike),
             ("sigma11", vec![1, 1], CapabilityKind::WriteLike),
         ] {
-            acl.register_capability(Capability::new(id, id, partition, kind))
-                .unwrap();
+            acl.register_capability(Capability::new(
+                CapabilityId::new(id).expect("valid id"),
+                id,
+                partition,
+                kind,
+            ))
+            .unwrap();
         }
         acl
     }
@@ -1222,7 +1271,9 @@ mod tests {
     #[test]
     fn lr_path_sigma1_fourth_equals_2() {
         let mut acl = setup_acl();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         for cap in &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"] {
             acl.grant(&p, cap).unwrap();
         }
@@ -1246,7 +1297,9 @@ mod tests {
     #[test]
     fn localization_path_sigma1_fourth_equals_2() {
         let mut acl = setup_acl();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         for cap in &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"] {
             acl.grant(&p, cap).unwrap();
         }
@@ -1270,7 +1323,9 @@ mod tests {
     #[test]
     fn tropical_path_sigma1_fourth_returns_finite() {
         let mut acl = setup_acl();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         for cap in &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"] {
             acl.grant(&p, cap).unwrap();
         }
@@ -1297,7 +1352,9 @@ mod tests {
     #[test]
     fn lr_path_sigma2_sigma11_is_impossible() {
         let mut acl = setup_acl();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma2").unwrap();
         acl.grant(&p, "sigma11").unwrap();
         let decision = acl
@@ -1316,7 +1373,9 @@ mod tests {
     #[test]
     fn localization_path_sigma2_sigma11_is_impossible() {
         let mut acl = setup_acl();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma2").unwrap();
         acl.grant(&p, "sigma11").unwrap();
         let decision = acl
@@ -1331,7 +1390,9 @@ mod tests {
     #[test]
     fn matroid_path_detects_impossible() {
         let mut acl = setup_acl();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma2").unwrap();
         acl.grant(&p, "sigma11").unwrap();
         let decision = acl
@@ -1346,7 +1407,9 @@ mod tests {
     #[test]
     fn auto_routing_selects_correct_path() {
         let mut acl = setup_acl();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         // Small Grassmannian Gr(2,4) with n=4 ≤ 8 and 1 class → should pick LR
         acl.grant(&p, "sigma2").unwrap();
         let decision_lr = acl.check(&p, &["sigma2"]).unwrap();
@@ -1360,7 +1423,9 @@ mod tests {
     #[test]
     fn paths_produce_consistent_sigma1_fourth() {
         let mut acl = setup_acl();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         for cap in &["sigma1_a", "sigma1_b", "sigma1_c", "sigma1_d"] {
             acl.grant(&p, cap).unwrap();
         }
@@ -1403,7 +1468,9 @@ mod tests {
     #[test]
     fn paths_agree_on_impossible() {
         let mut acl = setup_acl();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma2").unwrap();
         acl.grant(&p, "sigma11").unwrap();
 
@@ -1445,7 +1512,9 @@ mod tests {
     #[test]
     fn check_single_granted() {
         let mut acl = make_controller();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma1_0").unwrap();
 
         let decision = acl.check_single(&p, "sigma1_0").unwrap();
@@ -1455,7 +1524,9 @@ mod tests {
     #[test]
     fn check_single_denied() {
         let mut acl = make_controller();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma1_0").unwrap();
 
         let decision = acl.check_single(&p, "sigma2_0").unwrap();
@@ -1465,7 +1536,7 @@ mod tests {
     #[test]
     fn check_single_principal_not_found() {
         let acl = make_controller();
-        let p = PrincipalId::new("nobody");
+        let p = PrincipalId::new("nobody").expect("valid id");
         assert!(acl.check_single(&p, "sigma1_0").is_err());
     }
 
@@ -1475,7 +1546,9 @@ mod tests {
         // by returning Denied when the capability is not held, even though
         // a non-existent capability could have been geometrically possible.
         let mut acl = make_controller();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma2_0").unwrap();
         acl.grant(&p, "sigma11").unwrap();
 
@@ -1509,8 +1582,13 @@ mod parallel_tests {
             ("sigma2", vec![2], CapabilityKind::WriteLike),
             ("sigma22", vec![2, 2], CapabilityKind::AdminLike),
         ] {
-            acl.register_capability(Capability::new(id, id, partition, kind))
-                .unwrap();
+            acl.register_capability(Capability::new(
+                CapabilityId::new(id).expect("valid id"),
+                id,
+                partition,
+                kind,
+            ))
+            .unwrap();
         }
         acl
     }
@@ -1518,8 +1596,12 @@ mod parallel_tests {
     #[test]
     fn check_batch_multiple_principals() {
         let mut acl = setup();
-        let p1 = acl.create_principal("alice").unwrap();
-        let p2 = acl.create_principal("bob").unwrap();
+        let p1 = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let p2 = acl
+            .create_principal(PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
         acl.grant(&p1, "sigma22").unwrap();
         acl.grant(&p2, "sigma1_a").unwrap();
         acl.grant(&p2, "sigma1_b").unwrap();
@@ -1556,8 +1638,12 @@ mod parallel_tests {
     #[test]
     fn check_batch_handles_denied_principal() {
         let mut acl = setup();
-        let p1 = acl.create_principal("alice").unwrap();
-        let p2 = acl.create_principal("bob").unwrap();
+        let p1 = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let p2 = acl
+            .create_principal(PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
         acl.grant(&p1, "sigma22").unwrap();
         // Bob has no sigma2
 
@@ -1585,8 +1671,12 @@ mod parallel_tests {
     #[test]
     fn stability_batch_multiple_principals() {
         let mut acl = setup();
-        let p1 = acl.create_principal("alice").unwrap();
-        let p2 = acl.create_principal("bob").unwrap();
+        let p1 = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let p2 = acl
+            .create_principal(PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
         acl.grant(&p1, "sigma1_a").unwrap();
         acl.grant(&p2, "sigma1_a").unwrap();
         acl.grant(&p2, "sigma2").unwrap();
@@ -1606,8 +1696,12 @@ mod parallel_tests {
     #[test]
     fn compose_batch_multiple_pairs() {
         let mut acl = setup();
-        let p1 = acl.create_principal("producer").unwrap();
-        let p2 = acl.create_principal("consumer").unwrap();
+        let p1 = acl
+            .create_principal(PrincipalId::new("producer").expect("valid id"))
+            .unwrap();
+        let p2 = acl
+            .create_principal(PrincipalId::new("consumer").expect("valid id"))
+            .unwrap();
         // Both principals hold sigma1_a — that's the shared interface
         acl.grant(&p1, "sigma1_a").unwrap();
         acl.grant(&p1, "sigma2").unwrap(); // extra cap on producer
@@ -1632,8 +1726,12 @@ mod parallel_tests {
     #[test]
     fn check_batch_matches_sequential() {
         let mut acl = setup();
-        let p1 = acl.create_principal("alice").unwrap();
-        let p2 = acl.create_principal("bob").unwrap();
+        let p1 = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let p2 = acl
+            .create_principal(PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
         acl.grant(&p1, "sigma22").unwrap();
         acl.grant(&p2, "sigma1_a").unwrap();
         acl.grant(&p2, "sigma1_b").unwrap();
@@ -1667,20 +1765,22 @@ mod parallel_tests {
     fn context_resource_scoped_checking() {
         let mut acl = setup();
         acl.register_capability(Capability::new(
-            "read/doc/42",
+            CapabilityId::new("read/doc/42").expect("valid id"),
             "Read doc 42",
             vec![1],
             CapabilityKind::ReadLike,
         ))
         .unwrap();
         acl.register_capability(Capability::new(
-            "read",
+            CapabilityId::new("read").expect("valid id"),
             "Read",
             vec![1],
             CapabilityKind::ReadLike,
         ))
         .unwrap();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "read").unwrap();
         acl.grant(&p, "read/doc/42").unwrap();
 
@@ -1695,7 +1795,9 @@ mod parallel_tests {
     #[test]
     fn context_empty_is_standard_check() {
         let mut acl = setup();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma22").unwrap();
 
         let standard = acl.check(&p, &["sigma22"]).unwrap();
@@ -1708,7 +1810,9 @@ mod parallel_tests {
     #[test]
     fn context_time_aware_trust() {
         let mut acl = setup();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma22").unwrap();
 
         let ctx_old =
@@ -1723,7 +1827,9 @@ mod parallel_tests {
     #[test]
     fn context_no_time_does_not_degrade() {
         let mut acl = setup();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "sigma22").unwrap();
 
         let ctx = AccessContext::empty();
@@ -1742,10 +1848,17 @@ mod parallel_tests {
     #[test]
     fn temporal_expired_capability_denied() {
         let mut acl = setup();
-        let cap = Capability::new("temp_read", "Temp", vec![1], CapabilityKind::ReadLike)
-            .with_expiry(1000);
+        let cap = Capability::new(
+            CapabilityId::new("temp_read").expect("valid id"),
+            "Temp",
+            vec![1],
+            CapabilityKind::ReadLike,
+        )
+        .with_expiry(1000);
         acl.register_capability(cap).unwrap();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "temp_read").unwrap();
 
         let d = acl.check_temporal(&p, &["temp_read"], 500).unwrap();
@@ -1759,13 +1872,15 @@ mod parallel_tests {
     fn temporal_no_expiry_always_allowed() {
         let mut acl = setup();
         acl.register_capability(Capability::new(
-            "forever",
+            CapabilityId::new("forever").expect("valid id"),
             "Forever",
             vec![1],
             CapabilityKind::ReadLike,
         ))
         .unwrap();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "forever").unwrap();
 
         for t in &[0, 1000, 1_000_000_000_000u64] {
@@ -1778,14 +1893,28 @@ mod parallel_tests {
     fn temporal_mixed_expiry() {
         let mut acl = setup();
         acl.register_capability(
-            Capability::new("short", "Short", vec![1], CapabilityKind::ReadLike).with_expiry(1000),
+            Capability::new(
+                CapabilityId::new("short").expect("valid id"),
+                "Short",
+                vec![1],
+                CapabilityKind::ReadLike,
+            )
+            .with_expiry(1000),
         )
         .unwrap();
         acl.register_capability(
-            Capability::new("long", "Long", vec![1], CapabilityKind::ReadLike).with_expiry(10000),
+            Capability::new(
+                CapabilityId::new("long").expect("valid id"),
+                "Long",
+                vec![1],
+                CapabilityKind::ReadLike,
+            )
+            .with_expiry(10000),
         )
         .unwrap();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "short").unwrap();
         acl.grant(&p, "long").unwrap();
 
@@ -1802,14 +1931,28 @@ mod parallel_tests {
     fn expired_capabilities_list() {
         let mut acl = setup();
         acl.register_capability(
-            Capability::new("exp1", "E1", vec![1], CapabilityKind::ReadLike).with_expiry(100),
+            Capability::new(
+                CapabilityId::new("exp1").expect("valid id"),
+                "E1",
+                vec![1],
+                CapabilityKind::ReadLike,
+            )
+            .with_expiry(100),
         )
         .unwrap();
         acl.register_capability(
-            Capability::new("exp2", "E2", vec![1], CapabilityKind::ReadLike).with_expiry(200),
+            Capability::new(
+                CapabilityId::new("exp2").expect("valid id"),
+                "E2",
+                vec![1],
+                CapabilityKind::ReadLike,
+            )
+            .with_expiry(200),
         )
         .unwrap();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "exp1").unwrap();
         acl.grant(&p, "exp2").unwrap();
 
@@ -1822,7 +1965,13 @@ mod parallel_tests {
     fn temporal_trust_level_decay() {
         let mut acl = setup();
         acl.register_capability(
-            Capability::new("temp", "Temp", vec![1], CapabilityKind::ReadLike).with_expiry(1000),
+            Capability::new(
+                CapabilityId::new("temp").expect("valid id"),
+                "Temp",
+                vec![1],
+                CapabilityKind::ReadLike,
+            )
+            .with_expiry(1000),
         )
         .unwrap();
 
@@ -1843,10 +1992,18 @@ mod parallel_tests {
     fn capability_time_remaining() {
         let mut acl = setup();
         acl.register_capability(
-            Capability::new("temp", "Temp", vec![1], CapabilityKind::ReadLike).with_expiry(1000),
+            Capability::new(
+                CapabilityId::new("temp").expect("valid id"),
+                "Temp",
+                vec![1],
+                CapabilityKind::ReadLike,
+            )
+            .with_expiry(1000),
         )
         .unwrap();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "temp").unwrap();
 
         let remaining = acl.capability_time_remaining(&p, 400).unwrap();
@@ -1867,8 +2024,13 @@ mod serde_tests {
             ("admin", vec![2, 2], CapabilityKind::AdminLike),
             ("internal", vec![1, 1], CapabilityKind::WriteLike),
         ] {
-            acl.register_capability(Capability::new(id, id, partition, kind))
-                .unwrap();
+            acl.register_capability(Capability::new(
+                CapabilityId::new(id).expect("valid id"),
+                id,
+                partition,
+                kind,
+            ))
+            .unwrap();
         }
         acl
     }
@@ -1899,8 +2061,12 @@ mod serde_tests {
     #[test]
     fn roundtrip_principals_preserved() {
         let mut acl = setup();
-        let alice = acl.create_principal("alice").unwrap();
-        let bob = acl.create_principal("bob").unwrap();
+        let alice = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let bob = acl
+            .create_principal(PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
         acl.grant(&alice, "read").unwrap();
         acl.grant(&bob, "read").unwrap();
         acl.grant(&bob, "write").unwrap();
@@ -1920,8 +2086,12 @@ mod serde_tests {
     #[test]
     fn roundtrip_decisions_match() {
         let mut acl = setup();
-        let alice = acl.create_principal("alice").unwrap();
-        let bob = acl.create_principal("bob").unwrap();
+        let alice = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let bob = acl
+            .create_principal(PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
         acl.grant(&alice, "read").unwrap();
         acl.grant(&alice, "write").unwrap();
         acl.grant(&bob, "admin").unwrap();
@@ -1959,14 +2129,16 @@ mod serde_tests {
         for i in 0..4 {
             let id = format!("sigma1_{i}");
             acl.register_capability(Capability::new(
-                id.clone(),
+                CapabilityId::new(id.clone()).expect("valid id"),
                 id.clone(),
                 vec![1],
                 CapabilityKind::ReadLike,
             ))
             .unwrap();
         }
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         for i in 0..4 {
             acl.grant(&p, &format!("sigma1_{i}")).unwrap();
         }
@@ -1990,7 +2162,9 @@ mod serde_tests {
     #[test]
     fn roundtrip_impossible_detected() {
         let mut acl = setup();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "write").unwrap(); // σ₂
         acl.grant(&p, "internal").unwrap(); // σ₁₁
 
@@ -2011,7 +2185,9 @@ mod serde_tests {
     #[test]
     fn roundtrip_revoke_preserved() {
         let mut acl = setup();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "read").unwrap();
         acl.grant(&p, "write").unwrap();
         acl.revoke(&p, "write").unwrap();
@@ -2030,7 +2206,9 @@ mod serde_tests {
     #[test]
     fn file_save_load_roundtrip() {
         let mut acl = setup();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "read").unwrap();
         acl.grant(&p, "write").unwrap();
 
@@ -2087,8 +2265,12 @@ grants = ["read"]
         assert!(acl.capability("write").is_some());
         assert!(acl.capability("admin").is_some());
 
-        let alice = acl.principal(&PrincipalId::new("alice")).unwrap();
-        let bob = acl.principal(&PrincipalId::new("bob")).unwrap();
+        let alice = acl
+            .principal(&PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let bob = acl
+            .principal(&PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
 
         assert!(alice.holds("read"));
         assert!(alice.holds("write"));
@@ -2099,8 +2281,8 @@ grants = ["read"]
     #[test]
     fn from_policy_access_checks() {
         let acl = AccessController::from_policy_toml(RBAC_POLICY).unwrap();
-        let alice = PrincipalId::new("alice");
-        let bob = PrincipalId::new("bob");
+        let alice = PrincipalId::new("alice").expect("valid id");
+        let bob = PrincipalId::new("bob").expect("valid id");
 
         let alice_read = acl.check(&alice, &["read"]).unwrap();
         assert!(matches!(
@@ -2139,7 +2321,7 @@ grants = ["read"]
         }
 
         // Check same grants
-        let alice = PrincipalId::new("alice");
+        let alice = PrincipalId::new("alice").expect("valid id");
         assert!(acl2.principal(&alice).unwrap().holds("read"));
         assert!(acl2.principal(&alice).unwrap().holds("write"));
     }
@@ -2173,12 +2355,16 @@ label = "Read"
         assert!(acl.capability("admin_star").is_some());
 
         // Check Alice (viewer: read_pods only)
-        let alice = acl.principal(&PrincipalId::new("alice")).unwrap();
+        let alice = acl
+            .principal(&PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         assert!(alice.holds("read_pods"));
         assert!(!alice.holds("write_pods"));
 
         // Check Dave (admin: admin_star only)
-        let dave = acl.principal(&PrincipalId::new("dave")).unwrap();
+        let dave = acl
+            .principal(&PrincipalId::new("dave").expect("valid id"))
+            .unwrap();
         assert!(dave.holds("admin_star"));
     }
 }

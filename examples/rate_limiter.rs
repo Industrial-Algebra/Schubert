@@ -8,7 +8,9 @@
 //!
 //! Run with: `cargo run --example rate_limiter`
 
-use schubert::{AccessController, Capability, CapabilityKind, RateLimiter};
+use schubert::{
+    AccessController, Capability, CapabilityId, CapabilityKind, PrincipalId, RateLimiter,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Quantitative Rate Limiting ===\n");
@@ -16,28 +18,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set up access control
     let mut acl = AccessController::new(2, 4)?;
     acl.register_capability(Capability::new(
-        "read",
+        CapabilityId::new("read").expect("valid id"),
         "Read",
         vec![1],
         CapabilityKind::ReadLike,
     ))?;
     acl.register_capability(Capability::new(
-        "write",
+        CapabilityId::new("write").expect("valid id"),
         "Write",
         vec![2],
         CapabilityKind::WriteLike,
     ))?;
     acl.register_capability(Capability::new(
-        "admin",
+        CapabilityId::new("admin").expect("valid id"),
         "Admin",
         vec![2, 2],
         CapabilityKind::AdminLike,
     ))?;
 
-    let alice = acl.create_principal("alice")?;
+    let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?;
     acl.grant(&alice, "read")?;
 
-    let bob = acl.create_principal("bob")?;
+    let bob = acl.create_principal(PrincipalId::new("bob").expect("valid id"))?;
     acl.grant(&bob, "read")?;
     acl.grant(&bob, "write")?;
     acl.grant(&bob, "admin")?;
@@ -49,29 +51,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let alice_decision = acl.check(&alice, &["read"])?;
     let bob_decision = acl.check(&bob, &["admin"])?;
 
-    rl.configure_from_decision("alice", &alice_decision)?;
-    rl.configure_from_decision("bob", &bob_decision)?;
+    rl.configure_from_decision(
+        PrincipalId::new("alice").expect("valid id"),
+        &alice_decision,
+    )?;
+    rl.configure_from_decision(PrincipalId::new("bob").expect("valid id"), &bob_decision)?;
 
     // Alice: read = σ₁ → intersection with position → positive dimensional
     // (underconstrained, no finite config count for rate limiting)
     println!("Alice's decision: {alice_decision:?}");
     println!(
         "Alice's rate limit: {:.1} tokens",
-        rl.capacity("alice").unwrap_or(0.0)
+        rl.capacity(PrincipalId::new("alice").expect("valid id"))
+            .unwrap_or(0.0)
     );
 
     // Bob: admin = σ₂₂ → point class → 1 configuration
     println!("Bob's decision: {bob_decision:?}");
     println!(
         "Bob's rate limit: {:.1} tokens",
-        rl.capacity("bob").unwrap_or(0.0)
+        rl.capacity(PrincipalId::new("bob").expect("valid id"))
+            .unwrap_or(0.0)
     );
 
     // Simulate requests
     println!("\n=== Simulated Requests ===\n");
 
     for i in 0..5 {
-        match rl.try_consume("bob") {
+        match rl.try_consume(PrincipalId::new("bob").expect("valid id")) {
             Ok(remaining) => println!("  Request {i}: ✅ allowed ({remaining:.1} tokens left)"),
             Err(e) => println!("  Request {i}: ❌ {e}"),
         }
@@ -81,26 +88,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== After Exhaustion ===\n");
     println!(
         "Can bob consume? {}",
-        if rl.can_consume("bob") { "yes" } else { "no" }
+        if rl.can_consume(PrincipalId::new("bob").expect("valid id")) {
+            "yes"
+        } else {
+            "no"
+        }
     );
 
     // Alice had an underconstrained result → couldn't configure
     // Demonstrate manual configuration from a known intersection number
-    rl.configure_principal("carol", 4); // sigma1^4 = 2 configs in Gr(2,4)
+    rl.configure_principal(PrincipalId::new("carol").expect("valid id"), 4); // sigma1^4 = 2 configs in Gr(2,4)
     println!(
         "Carol (manually configured, n=4): {:.1} tokens capacity",
-        rl.capacity("carol").unwrap()
+        rl.capacity(PrincipalId::new("carol").expect("valid id"))
+            .unwrap()
     );
 
     // Higher intersection = more tokens
-    rl.configure_principal("dave", 1); // sigma22 = 1 config
+    rl.configure_principal(PrincipalId::new("dave").expect("valid id"), 1); // sigma22 = 1 config
     println!(
         "Dave (n=1): {:.1} tokens capacity",
-        rl.capacity("dave").unwrap()
+        rl.capacity(PrincipalId::new("dave").expect("valid id"))
+            .unwrap()
     );
 
-    let carol_cap = rl.capacity("carol").unwrap();
-    let dave_cap = rl.capacity("dave").unwrap();
+    let carol_cap = rl
+        .capacity(PrincipalId::new("carol").expect("valid id"))
+        .unwrap();
+    let dave_cap = rl
+        .capacity(PrincipalId::new("dave").expect("valid id"))
+        .unwrap();
     println!(
         "\nCarol gets {:.1}x more throughput than Dave",
         carol_cap / dave_cap

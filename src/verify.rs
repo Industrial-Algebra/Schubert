@@ -219,7 +219,7 @@ pub unsafe fn certify_to_proven(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Capability, CapabilityKind};
+    use crate::{Capability, CapabilityId, CapabilityKind};
 
     #[test]
     fn schubert_bundle_has_five_obligations() {
@@ -239,7 +239,12 @@ mod tests {
 
     #[test]
     fn certify_valid_capability() {
-        let cap = Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike);
+        let cap = Capability::new(
+            CapabilityId::new("read").expect("valid id"),
+            "Read",
+            vec![1],
+            CapabilityKind::ReadLike,
+        );
         let certified = certify_capability(cap, (2, 4)).unwrap();
         assert_eq!(certified.certificate().backend, "karpal-proof");
         assert_eq!(certified.value().id.as_str(), "read");
@@ -247,13 +252,23 @@ mod tests {
 
     #[test]
     fn certify_invalid_capability_fails() {
-        let cap = Capability::new("bad", "Bad", vec![5], CapabilityKind::ReadLike);
+        let cap = Capability::new(
+            CapabilityId::new("bad").expect("valid id"),
+            "Bad",
+            vec![5],
+            CapabilityKind::ReadLike,
+        );
         assert!(certify_capability(cap, (2, 4)).is_err());
     }
 
     #[test]
     fn certify_to_proven_crosses_trust_boundary() {
-        let cap = Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike);
+        let cap = Capability::new(
+            CapabilityId::new("read").expect("valid id"),
+            "Read",
+            vec![1],
+            CapabilityKind::ReadLike,
+        );
         let certified = certify_capability(cap, (2, 4)).unwrap();
         let proven: karpal_proof::Proven<crate::proof::IsValidCapability, crate::Capability> =
             unsafe { certify_to_proven(certified) };

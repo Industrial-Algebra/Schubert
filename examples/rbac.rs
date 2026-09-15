@@ -8,48 +8,50 @@
 //!
 //! Roles: viewer (σ₁), editor (σ₁+σ₂), operator (σ₁+σ₂₁), admin (σ₂₂)
 
-use schubert::{AccessController, AccessDecision, Capability, CapabilityKind};
+use schubert::{
+    AccessController, AccessDecision, Capability, CapabilityId, CapabilityKind, PrincipalId,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut acl = AccessController::new(2, 4)?;
 
     acl.register_capability(Capability::new(
-        "read:pods",
+        CapabilityId::new("read:pods").expect("valid id"),
         "Read pods",
         vec![1],
         CapabilityKind::ReadLike,
     ))?;
     acl.register_capability(Capability::new(
-        "write:pods",
+        CapabilityId::new("write:pods").expect("valid id"),
         "Write pods",
         vec![2],
         CapabilityKind::WriteLike,
     ))?;
     acl.register_capability(Capability::new(
-        "manage:deployments",
+        CapabilityId::new("manage:deployments").expect("valid id"),
         "Manage deployments",
         vec![2, 1],
         CapabilityKind::AdminLike,
     ))?;
     acl.register_capability(Capability::new(
-        "admin:*",
+        CapabilityId::new("admin:*").expect("valid id"),
         "Full admin",
         vec![2, 2],
         CapabilityKind::AdminLike,
     ))?;
 
-    let alice = acl.create_principal("alice")?;
+    let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?;
     acl.grant(&alice, "read:pods")?;
 
-    let bob = acl.create_principal("bob")?;
+    let bob = acl.create_principal(PrincipalId::new("bob").expect("valid id"))?;
     acl.grant(&bob, "read:pods")?;
     acl.grant(&bob, "write:pods")?;
 
-    let carol = acl.create_principal("carol")?;
+    let carol = acl.create_principal(PrincipalId::new("carol").expect("valid id"))?;
     acl.grant(&carol, "read:pods")?;
     acl.grant(&carol, "manage:deployments")?;
 
-    let dave = acl.create_principal("dave")?;
+    let dave = acl.create_principal(PrincipalId::new("dave").expect("valid id"))?;
     acl.grant(&dave, "admin:*")?;
 
     println!("=== Kubernetes RBAC via Schubert Access Control ===\n");

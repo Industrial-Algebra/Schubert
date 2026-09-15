@@ -18,7 +18,7 @@
 //! # Example
 //!
 //! ```
-//! use schubert::{AccessController, Capability, CapabilityKind, MultiController, PrincipalId};
+//! use schubert::{AccessController, Capability, CapabilityId, CapabilityKind, MultiController, PrincipalId};
 //!
 //! let mut mc = MultiController::new();
 //! let gr24 = mc.add_domain(2, 4)?;
@@ -26,12 +26,12 @@
 //!
 //! // Register a capability in Gr(2,4)
 //! mc.register_in_domain(
-//!     Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike),
+//!     Capability::new(CapabilityId::new("read").expect("valid id"), "Read", vec![1], CapabilityKind::ReadLike),
 //!     &gr24,
 //! )?;
 //!
 //! // Create a principal and grant
-//! let alice_id = mc.create_principal("alice", &gr24)?;
+//! let alice_id = mc.create_principal(PrincipalId::new("alice").expect("valid id"), &gr24)?;
 //! mc.grant_in_domain(&alice_id, "read", &gr24)?;
 //!
 //! // Check within same domain
@@ -130,11 +130,7 @@ impl MultiController {
     // ── Principal operations ──────────────────────────────────────
 
     /// Create a principal in a specific domain.
-    pub fn create_principal(
-        &mut self,
-        id: impl Into<PrincipalId>,
-        domain_label: &str,
-    ) -> Result<PrincipalId> {
+    pub fn create_principal(&mut self, id: PrincipalId, domain_label: &str) -> Result<PrincipalId> {
         let controller = self
             .domains
             .get_mut(domain_label)
@@ -220,7 +216,7 @@ impl MultiController {
         let (tk, tn) = target.grassmannian();
         let mut translated_classes = Vec::with_capacity(required.len());
         for cap_id_str in required {
-            let cid = CapabilityId::new(*cap_id_str);
+            let cid = CapabilityId::new(*cap_id_str)?;
             let cap = source
                 .capability(cap_id_str)
                 .ok_or_else(|| SchubertError::CapabilityNotFound(cid.to_string()))?;
@@ -306,17 +302,32 @@ mod tests {
 
         // Register capabilities in both domains
         mc.register_in_domain(
-            Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike),
+            Capability::new(
+                CapabilityId::new("read").expect("valid id"),
+                "Read",
+                vec![1],
+                CapabilityKind::ReadLike,
+            ),
             "gr4_2",
         )
         .unwrap();
         mc.register_in_domain(
-            Capability::new("write", "Write", vec![2], CapabilityKind::WriteLike),
+            Capability::new(
+                CapabilityId::new("write").expect("valid id"),
+                "Write",
+                vec![2],
+                CapabilityKind::WriteLike,
+            ),
             "gr4_2",
         )
         .unwrap();
         mc.register_in_domain(
-            Capability::new("read", "Read", vec![1], CapabilityKind::ReadLike),
+            Capability::new(
+                CapabilityId::new("read").expect("valid id"),
+                "Read",
+                vec![1],
+                CapabilityKind::ReadLike,
+            ),
             "gr6_3",
         )
         .unwrap();
@@ -337,7 +348,9 @@ mod tests {
     #[test]
     fn domain_check_same_domain() {
         let mut mc = setup();
-        let alice = mc.create_principal("alice", "gr4_2").unwrap();
+        let alice = mc
+            .create_principal(PrincipalId::new("alice").expect("valid id"), "gr4_2")
+            .unwrap();
         mc.grant_in_domain(&alice, "read", "gr4_2").unwrap();
 
         let decision = mc.check_in_domain(&alice, &["read"], "gr4_2").unwrap();
@@ -347,7 +360,9 @@ mod tests {
     #[test]
     fn cross_domain_translatable() {
         let mut mc = setup();
-        let alice = mc.create_principal("alice", "gr4_2").unwrap();
+        let alice = mc
+            .create_principal(PrincipalId::new("alice").expect("valid id"), "gr4_2")
+            .unwrap();
         mc.grant_in_domain(&alice, "read", "gr4_2").unwrap();
 
         // "read" is σ₁ — fits in both Gr(2,4) and Gr(3,6)
@@ -358,7 +373,9 @@ mod tests {
     #[test]
     fn cross_domain_check_translatable() {
         let mut mc = setup();
-        let alice = mc.create_principal("alice", "gr4_2").unwrap();
+        let alice = mc
+            .create_principal(PrincipalId::new("alice").expect("valid id"), "gr4_2")
+            .unwrap();
         mc.grant_in_domain(&alice, "read", "gr4_2").unwrap();
 
         // Check cross-domain: reading from gr24 to gr36
@@ -372,7 +389,9 @@ mod tests {
     #[test]
     fn cross_domain_denied_if_not_held() {
         let mut mc = setup();
-        let alice = mc.create_principal("alice", "gr4_2").unwrap();
+        let alice = mc
+            .create_principal(PrincipalId::new("alice").expect("valid id"), "gr4_2")
+            .unwrap();
         // alice doesn't hold "write"
 
         let decision = mc

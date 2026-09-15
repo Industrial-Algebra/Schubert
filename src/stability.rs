@@ -111,17 +111,17 @@ pub struct StabilityReport {
 /// # Example
 ///
 /// ```
-/// use schubert::{AccessController, Capability, CapabilityKind, analyze_stability, TrustLevel};
+/// use schubert::{AccessController, Capability, CapabilityId, CapabilityKind, PrincipalId, analyze_stability, TrustLevel};
 ///
 /// let mut acl = AccessController::new(2, 4)?;
 /// acl.register_capability(Capability::new(
-///     "read", "Read", vec![1], CapabilityKind::ReadLike,
+///     CapabilityId::new("read").expect("valid id"), "Read", vec![1], CapabilityKind::ReadLike,
 /// ))?;
 /// acl.register_capability(Capability::new(
-///     "write", "Write", vec![2], CapabilityKind::WriteLike,
+///     CapabilityId::new("write").expect("valid id"), "Write", vec![2], CapabilityKind::WriteLike,
 /// ))?;
 ///
-/// let alice = acl.create_principal("alice")?;
+/// let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?;
 /// acl.grant(&alice, "read")?;
 /// acl.grant(&alice, "write")?;
 ///
@@ -201,10 +201,10 @@ fn build_stability_report(
 /// # Example
 ///
 /// ```
-/// # use schubert::{AccessController, Capability, CapabilityKind, stable_capabilities_at, TrustLevel};
+/// # use schubert::{AccessController, Capability, CapabilityId, CapabilityKind, PrincipalId, stable_capabilities_at, TrustLevel};
 /// # let mut acl = AccessController::new(2, 4).unwrap();
-/// # acl.register_capability(Capability::new("read", "", vec![1], CapabilityKind::ReadLike)).unwrap();
-/// # let p = acl.create_principal("p").unwrap();
+/// # acl.register_capability(Capability::new(CapabilityId::new("read").expect("valid id"), "", vec![1], CapabilityKind::ReadLike)).unwrap();
+/// # let p = acl.create_principal(PrincipalId::new("p").expect("valid id")).unwrap();
 /// # acl.grant(&p, "read").unwrap();
 /// let stable = stable_capabilities_at(&acl, &p, TrustLevel::new(0.5))?;
 /// println!("Stable at 0.5 trust: {stable:?}");
@@ -262,17 +262,17 @@ pub struct InterfaceCapabilities {
 /// # Example
 ///
 /// ```
-/// use schubert::{AccessController, Capability, CapabilityKind, analyze_composed_stability};
+/// use schubert::{AccessController, Capability, CapabilityId, CapabilityKind, PrincipalId, analyze_composed_stability};
 ///
 /// let mut acl = AccessController::new(2, 4)?;
-/// acl.register_capability(Capability::new("handoff", "Handoff", vec![1], CapabilityKind::ReadLike))?;
-/// acl.register_capability(Capability::new("audit", "Audit", vec![2], CapabilityKind::WriteLike))?;
-/// acl.register_capability(Capability::new("sign", "Sign", vec![1, 1], CapabilityKind::ReadLike))?;
+/// acl.register_capability(Capability::new(CapabilityId::new("handoff").expect("valid id"), "Handoff", vec![1], CapabilityKind::ReadLike))?;
+/// acl.register_capability(Capability::new(CapabilityId::new("audit").expect("valid id"), "Audit", vec![2], CapabilityKind::WriteLike))?;
+/// acl.register_capability(Capability::new(CapabilityId::new("sign").expect("valid id"), "Sign", vec![1, 1], CapabilityKind::ReadLike))?;
 ///
-/// let alice = acl.create_principal("alice")?; // outputs handoff, retains audit
+/// let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?; // outputs handoff, retains audit
 /// acl.grant(&alice, "handoff")?;
 /// acl.grant(&alice, "audit")?;
-/// let bob = acl.create_principal("bob")?; // inputs handoff, retains sign
+/// let bob = acl.create_principal(PrincipalId::new("bob").expect("valid id"))?; // inputs handoff, retains sign
 /// acl.grant(&bob, "handoff")?;
 /// acl.grant(&bob, "sign")?;
 ///
@@ -380,7 +380,11 @@ pub fn analyze_composed_stability(
         deviating.into_iter().map(TrustLevel::new).collect();
     let is_additive = non_additive_breakpoints.is_empty();
 
-    let composed_id = PrincipalId::new(format!("composed({} ∘ {})", principal_a.0, principal_b.0));
+    let composed_id = PrincipalId::new(format!(
+        "composed({} ∘ {})",
+        principal_a.as_str(),
+        principal_b.as_str()
+    ))?;
     let phase_diagram_composed = build_stability_report(
         &composed_id,
         &composed_ns,
@@ -436,21 +440,21 @@ mod tests {
     fn seeded_acl() -> AccessController {
         let mut acl = AccessController::new(2, 4).unwrap();
         acl.register_capability(Capability::new(
-            "handoff",
+            crate::CapabilityId::new("handoff").expect("valid id"),
             "Handoff",
             vec![1],
             CapabilityKind::ReadLike,
         ))
         .unwrap();
         acl.register_capability(Capability::new(
-            "audit",
+            crate::CapabilityId::new("audit").expect("valid id"),
             "Audit",
             vec![2],
             CapabilityKind::WriteLike,
         ))
         .unwrap();
         acl.register_capability(Capability::new(
-            "sign",
+            crate::CapabilityId::new("sign").expect("valid id"),
             "Sign",
             vec![1, 1],
             CapabilityKind::ReadLike,
@@ -462,8 +466,12 @@ mod tests {
     #[test]
     fn composed_stability_reports_all_three_diagrams() {
         let mut acl = seeded_acl();
-        let alice = acl.create_principal("alice").unwrap();
-        let bob = acl.create_principal("bob").unwrap();
+        let alice = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let bob = acl
+            .create_principal(PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
         acl.grant(&alice, "handoff").unwrap();
         acl.grant(&alice, "audit").unwrap();
         acl.grant(&bob, "handoff").unwrap();
@@ -471,8 +479,8 @@ mod tests {
 
         let report = analyze_composed_stability(&acl, &alice, "handoff", &bob, "handoff").unwrap();
 
-        assert_eq!(report.principal_a.0, "alice");
-        assert_eq!(report.principal_b.0, "bob");
+        assert_eq!(report.principal_a.as_str(), "alice");
+        assert_eq!(report.principal_b.as_str(), "bob");
         assert_eq!(report.interface.output, "handoff");
         assert_eq!(report.interface.input, "handoff");
         // C retains audit + sign (the interface is consumed on both sides).
@@ -491,8 +499,12 @@ mod tests {
     #[test]
     fn additivity_flag_is_self_consistent() {
         let mut acl = seeded_acl();
-        let alice = acl.create_principal("alice").unwrap();
-        let bob = acl.create_principal("bob").unwrap();
+        let alice = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let bob = acl
+            .create_principal(PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
         acl.grant(&alice, "handoff").unwrap();
         acl.grant(&alice, "audit").unwrap();
         acl.grant(&bob, "handoff").unwrap();
@@ -509,8 +521,12 @@ mod tests {
     #[test]
     fn rejects_non_composable_pair() {
         let mut acl = seeded_acl();
-        let alice = acl.create_principal("alice").unwrap();
-        let bob = acl.create_principal("bob").unwrap();
+        let alice = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let bob = acl
+            .create_principal(PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
         // alice does NOT hold the output capability -> compose() must fail.
         acl.grant(&alice, "audit").unwrap();
         acl.grant(&bob, "handoff").unwrap();
@@ -527,8 +543,12 @@ mod tests {
         // additive baseline must deduplicate too — otherwise every overlap
         // reads as false emergence.
         let mut acl = seeded_acl();
-        let alice = acl.create_principal("alice").unwrap();
-        let bob = acl.create_principal("bob").unwrap();
+        let alice = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let bob = acl
+            .create_principal(PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
         // A: handoff (output) + audit; B: handoff (input) + audit + sign.
         acl.grant(&alice, "handoff").unwrap();
         acl.grant(&alice, "audit").unwrap();

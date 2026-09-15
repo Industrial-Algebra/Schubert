@@ -426,26 +426,28 @@ pub mod karpal_compose {
 #[cfg(all(test, feature = "karpal"))]
 mod tests {
     use super::*;
-    use crate::{AccessController, AccessDecision, Capability, CapabilityKind};
+    use crate::{
+        AccessController, AccessDecision, Capability, CapabilityId, CapabilityKind, PrincipalId,
+    };
 
     fn setup() -> AccessController {
         let mut acl = AccessController::new(2, 4).unwrap();
         acl.register_capability(Capability::new(
-            "read:data",
+            CapabilityId::new("read:data").expect("valid id"),
             "Read",
             vec![1],
             CapabilityKind::ReadLike,
         ))
         .unwrap();
         acl.register_capability(Capability::new(
-            "write:data",
+            CapabilityId::new("write:data").expect("valid id"),
             "Write",
             vec![2],
             CapabilityKind::WriteLike,
         ))
         .unwrap();
         acl.register_capability(Capability::new(
-            "admin:*",
+            CapabilityId::new("admin:*").expect("valid id"),
             "Admin",
             vec![2, 2],
             CapabilityKind::AdminLike,
@@ -456,7 +458,12 @@ mod tests {
 
     #[test]
     fn prove_capability_valid() {
-        let cap = Capability::new("test", "Test", vec![1], CapabilityKind::ReadLike);
+        let cap = Capability::new(
+            CapabilityId::new("test").expect("valid id"),
+            "Test",
+            vec![1],
+            CapabilityKind::ReadLike,
+        );
         let proven = cap.prove((2, 4)).unwrap();
         // Zero-sized proof — accessing value
         assert_eq!(proven.value().id.as_str(), "test");
@@ -465,14 +472,21 @@ mod tests {
 
     #[test]
     fn prove_capability_invalid_partition_fails() {
-        let cap = Capability::new("bad", "Bad", vec![5], CapabilityKind::ReadLike);
+        let cap = Capability::new(
+            CapabilityId::new("bad").expect("valid id"),
+            "Bad",
+            vec![5],
+            CapabilityKind::ReadLike,
+        );
         assert!(cap.prove((2, 4)).is_err());
     }
 
     #[test]
     fn prove_finite_access() {
         let mut acl = setup();
-        let p = acl.create_principal("alice").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "admin:*").unwrap();
 
         let decision = acl.check(&p, &["admin:*"]).unwrap();
@@ -542,7 +556,9 @@ mod tests {
     #[test]
     fn law_grant_idempotency() {
         let mut acl = setup();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
 
         // Grant read:data — should be idempotent
         law::check_grant_idempotency(&mut acl, &p, "read:data").unwrap();
@@ -551,7 +567,9 @@ mod tests {
     #[test]
     fn law_grant_revoke_identity() {
         let mut acl = setup();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
 
         // Grant then revoke read:data — back to initial
         law::check_grant_revoke_identity(&mut acl, &p, "read:data").unwrap();
@@ -560,7 +578,9 @@ mod tests {
     #[test]
     fn law_access_idempotency() {
         let mut acl = setup();
-        let p = acl.create_principal("test").unwrap();
+        let p = acl
+            .create_principal(PrincipalId::new("test").expect("valid id"))
+            .unwrap();
         acl.grant(&p, "read:data").unwrap();
 
         // Check same requirement twice — same result
@@ -571,7 +591,12 @@ mod tests {
     fn prove_and_derive_chain() {
         use karpal_proof::Proven;
 
-        let cap = Capability::new("admin", "Admin", vec![2, 2], CapabilityKind::AdminLike);
+        let cap = Capability::new(
+            CapabilityId::new("admin").expect("valid id"),
+            "Admin",
+            vec![2, 2],
+            CapabilityKind::AdminLike,
+        );
         let admin_proof: Proven<IsAdminLike, Capability> = unsafe { Proven::axiom(cap) };
 
         // Derive downward through the hierarchy (clone to avoid move)

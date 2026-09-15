@@ -74,7 +74,7 @@ grants = ["admin_all"]
 
     println!("Access checks:");
     for (principal, required) in &checks {
-        let pid = PrincipalId::new(*principal);
+        let pid = PrincipalId::new(*principal).expect("valid id");
         let decision = acl.check(&pid, required)?;
         let status = match &decision {
             AccessDecision::Granted {
@@ -102,8 +102,14 @@ grants = ["admin_all"]
     let reimported = AccessController::from_policy_toml(&exported)?;
 
     // Verify the reimported controller produces the same decisions
-    let original_decision = acl.check(&PrincipalId::new("alice"), &["read_data"])?;
-    let roundtrip_decision = reimported.check(&PrincipalId::new("alice"), &["read_data"])?;
+    let original_decision = acl.check(
+        &PrincipalId::new("alice").expect("valid id"),
+        &["read_data"],
+    )?;
+    let roundtrip_decision = reimported.check(
+        &PrincipalId::new("alice").expect("valid id"),
+        &["read_data"],
+    )?;
     assert_eq!(original_decision, roundtrip_decision);
     println!("✅ Policy roundtrip: decisions match after export → import");
 

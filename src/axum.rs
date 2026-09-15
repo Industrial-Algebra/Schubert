@@ -17,7 +17,7 @@
 //! use schubert::crypto::{CapabilityIssuer, GrantVerifier};
 //!
 //! let issuer = CapabilityIssuer::generate();
-//! let verifier = Arc::new(GrantVerifier::new(issuer.public_key()));
+//! let verifier = Arc::new(GrantVerifier::new(issuer.public_key()).expect("valid key"));
 //!
 //! let app = Router::new()
 //!     .route("/data", get(read_handler))
@@ -143,13 +143,13 @@ where
 mod tests {
     use super::*;
     use crate::crypto::{CapabilityIssuer, GrantVerifier};
-    use crate::CapabilityId;
+    use crate::{CapabilityId, PrincipalId};
     use axum::http::Request;
 
     /// Build a `(CapabilityId, partition)` grant entry, mirroring the crypto
     /// module's test helper.
     fn cap(id: &str, partition: Vec<usize>) -> (CapabilityId, Vec<usize>) {
-        (CapabilityId::new(id), partition)
+        (CapabilityId::new(id).expect("valid id"), partition)
     }
 
     /// Base64 bearer payload for a grant, exactly as a client would send it.
@@ -189,9 +189,12 @@ mod tests {
     async fn extractor_valid_token_yields_principal() {
         let issuer = CapabilityIssuer::generate();
         let grant = issuer
-            .issue_grant("alice", &[cap("memory:read", vec![1])])
+            .issue_grant(
+                PrincipalId::new("alice").expect("valid id"),
+                &[cap("memory:read", vec![1])],
+            )
             .unwrap();
-        let verifier = Arc::new(GrantVerifier::new(issuer.public_key()));
+        let verifier = Arc::new(GrantVerifier::new(issuer.public_key()).expect("valid key"));
 
         let mut parts = parts_with_auth(Some(&format!("Bearer {}", bearer(&grant))));
         parts.extensions.insert(verifier);
@@ -205,7 +208,7 @@ mod tests {
     #[tokio::test]
     async fn extractor_missing_header_is_401() {
         let issuer = CapabilityIssuer::generate();
-        let verifier = Arc::new(GrantVerifier::new(issuer.public_key()));
+        let verifier = Arc::new(GrantVerifier::new(issuer.public_key()).expect("valid key"));
 
         let mut parts = parts_with_auth(None);
         parts.extensions.insert(verifier);
@@ -219,7 +222,7 @@ mod tests {
     #[tokio::test]
     async fn extractor_malformed_base64_is_401() {
         let issuer = CapabilityIssuer::generate();
-        let verifier = Arc::new(GrantVerifier::new(issuer.public_key()));
+        let verifier = Arc::new(GrantVerifier::new(issuer.public_key()).expect("valid key"));
 
         let mut parts = parts_with_auth(Some("Bearer !!!not-base64!!!"));
         parts.extensions.insert(verifier);
@@ -236,11 +239,14 @@ mod tests {
         // verification against this verifier.
         let other = CapabilityIssuer::generate();
         let forged = other
-            .issue_grant("mallory", &[cap("memory:read", vec![1])])
+            .issue_grant(
+                PrincipalId::new("mallory").expect("valid id"),
+                &[cap("memory:read", vec![1])],
+            )
             .unwrap();
 
         let issuer = CapabilityIssuer::generate();
-        let verifier = Arc::new(GrantVerifier::new(issuer.public_key()));
+        let verifier = Arc::new(GrantVerifier::new(issuer.public_key()).expect("valid key"));
 
         let mut parts = parts_with_auth(Some(&format!("Bearer {}", bearer(&forged))));
         parts.extensions.insert(verifier);
@@ -254,17 +260,20 @@ mod tests {
     #[tokio::test]
     async fn extractor_tampered_capabilities_is_401() {
         let issuer = CapabilityIssuer::generate();
-        let verifier = Arc::new(GrantVerifier::new(issuer.public_key()));
+        let verifier = Arc::new(GrantVerifier::new(issuer.public_key()).expect("valid key"));
 
         // Issue a read-only grant, then forge a write capability into the
         // stored token. The signature no longer covers the extra cap, so the
         // wire-format roundtrip still carries the tampered payload but
         // verification must reject it.
         let mut grant = issuer
-            .issue_grant("alice", &[cap("memory:read", vec![1])])
+            .issue_grant(
+                PrincipalId::new("alice").expect("valid id"),
+                &[cap("memory:read", vec![1])],
+            )
             .unwrap();
         grant.capabilities.push(crate::crypto::GrantCapability {
-            id: CapabilityId::new("memory:write"),
+            id: CapabilityId::new("memory:write").expect("valid id"),
             partition: vec![2],
         });
 

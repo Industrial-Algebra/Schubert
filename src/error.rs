@@ -122,6 +122,20 @@ pub enum SchubertError {
         now: u64,
     },
 
+    /// A principal identifier failed validation (empty, or contains a NUL
+    /// byte that would make the NUL-terminated signing message ambiguous).
+    #[error("invalid principal id: {0:?}")]
+    InvalidPrincipalId(String),
+
+    /// A capability identifier failed validation (empty, or contains a NUL
+    /// byte that would make the NUL-terminated signing message ambiguous).
+    #[error("invalid capability id: {0:?}")]
+    InvalidCapabilityId(String),
+
+    /// A verifying key was malformed (wrong length or invalid Ed25519 bytes).
+    #[error("invalid verifying key: {0}")]
+    InvalidVerifyingKey(String),
+
     /// Grant issuance denied by policy (#20.3).
     ///
     /// The requested capability (or its partition) is not what the policy

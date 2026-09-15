@@ -5,7 +5,7 @@
 //!
 //! Run with: `cargo run --example cross_domain`
 
-use schubert::{Capability, CapabilityKind, MultiController};
+use schubert::{Capability, CapabilityId, CapabilityKind, MultiController, PrincipalId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Multi-Grassmannian Cross-Domain Access ===\n");
@@ -43,15 +43,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("simple", vec![("read", vec![1], CapabilityKind::ReadLike)]),
     ] {
         for (id, partition, kind) in caps {
-            mc.register_in_domain(Capability::new(id, id, partition, kind), domain)?;
+            mc.register_in_domain(
+                Capability::new(
+                    CapabilityId::new(id).expect("valid id"),
+                    id,
+                    partition,
+                    kind,
+                ),
+                domain,
+            )?;
         }
     }
 
-    let alice = mc.create_principal("alice", "rbac")?;
+    let alice = mc.create_principal(PrincipalId::new("alice").expect("valid id"), "rbac")?;
     mc.grant_in_domain(&alice, "read", "rbac")?;
     mc.grant_in_domain(&alice, "write", "rbac")?;
 
-    let bob = mc.create_principal("bob", "tenant")?;
+    let bob = mc.create_principal(PrincipalId::new("bob").expect("valid id"), "tenant")?;
     mc.grant_in_domain(&bob, "read", "tenant")?;
 
     println!("=== Same-Domain Checks ===\n");

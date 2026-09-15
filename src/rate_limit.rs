@@ -19,11 +19,12 @@
 //!
 //! ```
 //! use schubert::rate_limit::RateLimiter;
+//! use schubert::PrincipalId;
 //!
 //! let mut rl = RateLimiter::new(10.0, 1.0); // 10 tokens/sec base, 1.0 multiplier
-//! rl.configure_principal("alice", 2);    // alice has 2 configs → 20 tokens/sec
+//! rl.configure_principal(PrincipalId::new("alice").expect("valid id"), 2);    // alice has 2 configs → 20 tokens/sec
 //!
-//! assert!(rl.try_consume("alice").is_ok());   // consumes 1 token
+//! assert!(rl.try_consume(PrincipalId::new("alice").expect("valid id")).is_ok());   // consumes 1 token
 //! ```
 
 use std::collections::HashMap;
@@ -71,11 +72,7 @@ impl RateLimiter {
     ///
     /// Capacity = `intersection_number * multiplier * base_rate`.
     /// The bucket starts full.
-    pub fn configure_principal(
-        &mut self,
-        principal_id: impl Into<PrincipalId>,
-        intersection_number: u64,
-    ) {
+    pub fn configure_principal(&mut self, principal_id: PrincipalId, intersection_number: u64) {
         let capacity = intersection_number as f64 * self.multiplier * self.base_rate;
         let bucket = Bucket {
             tokens: capacity,
@@ -83,7 +80,7 @@ impl RateLimiter {
             refill_rate: self.base_rate * intersection_number as f64 * self.multiplier,
             last_refill_ms: crate::principal::now_millis(),
         };
-        self.buckets.insert(principal_id.into(), bucket);
+        self.buckets.insert(principal_id, bucket);
     }
 
     /// Configure a principal from an access decision.
@@ -92,7 +89,7 @@ impl RateLimiter {
     /// Returns an error if the decision is not `Granted`.
     pub fn configure_from_decision(
         &mut self,
-        principal_id: impl Into<PrincipalId>,
+        principal_id: PrincipalId,
         decision: &AccessDecision,
     ) -> Result<()> {
         match decision {
@@ -110,8 +107,8 @@ impl RateLimiter {
     ///
     /// Returns `Ok(tokens_remaining)` if a token was available,
     /// `Err(RateLimitExceeded)` if the bucket is empty.
-    pub fn try_consume(&mut self, principal_id: impl Into<PrincipalId>) -> Result<f64> {
-        let pid = principal_id.into();
+    pub fn try_consume(&mut self, principal_id: PrincipalId) -> Result<f64> {
+        let pid = principal_id;
         let now = crate::principal::now_millis();
 
         let bucket = self.buckets.get_mut(&pid).ok_or_else(|| {
@@ -135,8 +132,8 @@ impl RateLimiter {
     }
 
     /// Check whether a principal can consume a token without actually consuming it.
-    pub fn can_consume(&mut self, principal_id: impl Into<PrincipalId>) -> bool {
-        let pid = principal_id.into();
+    pub fn can_consume(&mut self, principal_id: PrincipalId) -> bool {
+        let pid = principal_id;
         let now = crate::principal::now_millis();
 
         if let Some(bucket) = self.buckets.get_mut(&pid) {
@@ -148,8 +145,8 @@ impl RateLimiter {
     }
 
     /// Get the current token count for a principal (after refill).
-    pub fn tokens_available(&mut self, principal_id: impl Into<PrincipalId>) -> Option<f64> {
-        let pid = principal_id.into();
+    pub fn tokens_available(&mut self, principal_id: PrincipalId) -> Option<f64> {
+        let pid = principal_id;
         let now = crate::principal::now_millis();
 
         self.buckets.get_mut(&pid).map(|bucket| {
@@ -159,8 +156,8 @@ impl RateLimiter {
     }
 
     /// Get the configured capacity for a principal.
-    pub fn capacity(&self, principal_id: impl Into<PrincipalId>) -> Option<f64> {
-        let pid = principal_id.into();
+    pub fn capacity(&self, principal_id: PrincipalId) -> Option<f64> {
+        let pid = principal_id;
         self.buckets.get(&pid).map(|b| b.capacity)
     }
 
@@ -201,32 +198,44 @@ mod tests {
     #[test]
     fn configure_and_consume() {
         let mut rl = RateLimiter::new(10.0, 1.0);
-        rl.configure_principal("alice", 2);
+        rl.configure_principal(PrincipalId::new("alice").expect("valid id"), 2);
 
         // Should have 2 * 1.0 * 10.0 = 20 tokens
-        assert!(rl.try_consume("alice").is_ok());
-        assert!(rl.try_consume("alice").is_ok());
+        assert!(rl
+            .try_consume(PrincipalId::new("alice").expect("valid id"))
+            .is_ok());
+        assert!(rl
+            .try_consume(PrincipalId::new("alice").expect("valid id"))
+            .is_ok());
     }
 
     #[test]
     fn exhaust_and_refill() {
         let mut rl = RateLimiter::new(1.0, 1.0); // 1 token per config per second
-        rl.configure_principal("alice", 1); // 1 config → 1 token capacity
+        rl.configure_principal(PrincipalId::new("alice").expect("valid id"), 1); // 1 config → 1 token capacity
 
         // Consume the only token
-        assert!(rl.try_consume("alice").is_ok());
+        assert!(rl
+            .try_consume(PrincipalId::new("alice").expect("valid id"))
+            .is_ok());
         // Second consume should fail
-        assert!(rl.try_consume("alice").is_err());
+        assert!(rl
+            .try_consume(PrincipalId::new("alice").expect("valid id"))
+            .is_err());
     }
 
     #[test]
     fn higher_intersection_gets_more() {
         let mut rl = RateLimiter::new(10.0, 1.0);
-        rl.configure_principal("alice", 1); // 10 tokens
-        rl.configure_principal("bob", 4); // 40 tokens
+        rl.configure_principal(PrincipalId::new("alice").expect("valid id"), 1); // 10 tokens
+        rl.configure_principal(PrincipalId::new("bob").expect("valid id"), 4); // 40 tokens
 
-        let alice_cap = rl.capacity("alice").unwrap();
-        let bob_cap = rl.capacity("bob").unwrap();
+        let alice_cap = rl
+            .capacity(PrincipalId::new("alice").expect("valid id"))
+            .unwrap();
+        let bob_cap = rl
+            .capacity(PrincipalId::new("bob").expect("valid id"))
+            .unwrap();
 
         // Bob should have 4x the capacity
         assert!((bob_cap / alice_cap - 4.0).abs() < 0.01);
@@ -239,36 +248,50 @@ mod tests {
             path: crate::ComputationPath::LittlewoodRichardson,
         };
         let mut rl = RateLimiter::new(5.0, 1.0);
-        rl.configure_from_decision("alice", &decision).unwrap();
+        rl.configure_from_decision(PrincipalId::new("alice").expect("valid id"), &decision)
+            .unwrap();
 
         // 3 configs * 1.0 * 5.0 = 15 tokens
-        assert!((rl.capacity("alice").unwrap() - 15.0).abs() < 0.01);
+        assert!(
+            (rl.capacity(PrincipalId::new("alice").expect("valid id"))
+                .unwrap()
+                - 15.0)
+                .abs()
+                < 0.01
+        );
     }
 
     #[test]
     fn configure_from_denied_fails() {
         let mut rl = RateLimiter::new(5.0, 1.0);
         assert!(rl
-            .configure_from_decision("alice", &AccessDecision::Denied)
+            .configure_from_decision(
+                PrincipalId::new("alice").expect("valid id"),
+                &AccessDecision::Denied
+            )
             .is_err());
     }
 
     #[test]
     fn can_consume_check() {
         let mut rl = RateLimiter::new(0.1, 1.0); // 0.1 token/sec/config
-        rl.configure_principal("alice", 1);
+        rl.configure_principal(PrincipalId::new("alice").expect("valid id"), 1);
         // With 0.1 rate, barely any tokens — but at least 0 capacity means can_consume is false
-        assert!(!rl.can_consume("alice"));
+        assert!(!rl.can_consume(PrincipalId::new("alice").expect("valid id")));
     }
 
     #[test]
     fn remove_and_missing_principal() {
         let mut rl = RateLimiter::new(10.0, 1.0);
-        rl.configure_principal("alice", 1);
+        rl.configure_principal(PrincipalId::new("alice").expect("valid id"), 1);
 
-        let alice = PrincipalId::new("alice");
+        let alice = PrincipalId::new("alice").expect("valid id");
         rl.remove_principal(&alice);
-        assert!(rl.capacity("alice").is_none());
-        assert!(rl.try_consume("alice").is_err());
+        assert!(rl
+            .capacity(PrincipalId::new("alice").expect("valid id"))
+            .is_none());
+        assert!(rl
+            .try_consume(PrincipalId::new("alice").expect("valid id"))
+            .is_err());
     }
 }

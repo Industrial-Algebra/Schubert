@@ -28,7 +28,7 @@
 //! ```
 
 use schubert::stability::analyze_composed_stability;
-use schubert::{AccessController, Capability, CapabilityKind};
+use schubert::{AccessController, Capability, CapabilityId, CapabilityKind, PrincipalId};
 
 /// A composition case: two principals, a shared interface, and a label.
 struct Case<'a> {
@@ -85,15 +85,15 @@ fn main() -> schubert::Result<()> {
         let mut acl = AccessController::new(2, 4)?;
         for (id, partition, kind) in &caps {
             acl.register_capability(Capability::new(
-                id.clone(),
+                CapabilityId::new(id.clone()).expect("valid id"),
                 id.clone(),
                 partition.clone(),
                 *kind,
             ))?;
         }
 
-        let pa = acl.create_principal("probe-a")?;
-        let pb = acl.create_principal("probe-b")?;
+        let pa = acl.create_principal(PrincipalId::new("probe-a").expect("valid id"))?;
+        let pb = acl.create_principal(PrincipalId::new("probe-b").expect("valid id"))?;
 
         // A holds the interface (as output) plus its retained set; B holds
         // the interface (as input) plus its retained set.

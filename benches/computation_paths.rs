@@ -7,35 +7,39 @@
 //! Tropical, Matroid) across 3 Grassmannians (Gr(2,4), Gr(3,6), Gr(4,8)).
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use schubert::{AccessController, Capability, CapabilityKind, ComputationPath};
+use schubert::{
+    AccessController, Capability, CapabilityId, CapabilityKind, ComputationPath, PrincipalId,
+};
 
 fn bench_path(c: &mut Criterion, name: &str, k: usize, n: usize, path: ComputationPath) {
     let mut acl = AccessController::new(k, n).unwrap();
 
     // Register capabilities
     acl.register_capability(Capability::new(
-        "read",
+        CapabilityId::new("read").expect("valid id"),
         "Read",
         vec![1],
         CapabilityKind::ReadLike,
     ))
     .unwrap();
     acl.register_capability(Capability::new(
-        "write",
+        CapabilityId::new("write").expect("valid id"),
         "Write",
         vec![2],
         CapabilityKind::WriteLike,
     ))
     .unwrap();
     acl.register_capability(Capability::new(
-        "admin",
+        CapabilityId::new("admin").expect("valid id"),
         "Admin",
         vec![2, 1],
         CapabilityKind::AdminLike,
     ))
     .unwrap();
 
-    let alice = acl.create_principal("alice").unwrap();
+    let alice = acl
+        .create_principal(PrincipalId::new("alice").expect("valid id"))
+        .unwrap();
     acl.grant(&alice, "read").unwrap();
     acl.grant(&alice, "write").unwrap();
 

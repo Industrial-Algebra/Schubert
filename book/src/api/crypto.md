@@ -29,8 +29,8 @@ let token = issuer.issue("alice", "memory:read")?;
 // Multi-capability grant — order-independent (canonicalized before signing)
 use schubert::CapabilityId;
 let grant = issuer.issue_grant("bob", &[
-    (CapabilityId::new("memory:read"),  vec![1]),
-    (CapabilityId::new("memory:write"), vec![2]),
+    (CapabilityId::new("memory:read").expect("valid id"),  vec![1]),
+    (CapabilityId::new("memory:write").expect("valid id"), vec![2]),
 ])?;
 ```
 

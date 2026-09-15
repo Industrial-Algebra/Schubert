@@ -12,13 +12,13 @@ geometric impossibility detection:
 ```rust
 // Tenant-scoped capabilities
 acl.register_capability(Capability::new(
-    "read:tenant_a", "Read tenant A", vec![1], ReadLike,
+    CapabilityId::new("read:tenant_a").expect("valid id"), "Read tenant A", vec![1], ReadLike,
 ))?;
 acl.register_capability(Capability::new(
-    "read:tenant_b", "Read tenant B", vec![1], ReadLike,
+    CapabilityId::new("read:tenant_b").expect("valid id"), "Read tenant B", vec![1], ReadLike,
 ))?;
 acl.register_capability(Capability::new(
-    "read:tenant_c", "Read tenant C", vec![1], ReadLike,
+    CapabilityId::new("read:tenant_c").expect("valid id"), "Read tenant C", vec![1], ReadLike,
 ))?;
 
 // Multi-tenant principal

@@ -55,7 +55,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::{Capability, CapabilityKind, Result, SchubertError};
+use crate::{Capability, CapabilityId, CapabilityKind, PrincipalId, Result, SchubertError};
 
 /// A complete access control policy in declarative form.
 ///
@@ -276,7 +276,7 @@ impl PolicyConfig {
         // Register capabilities
         for (name, cap_config) in &self.capabilities {
             let cap = Capability::with_description(
-                name.clone(),
+                CapabilityId::new(name.clone())?,
                 cap_config.label.clone(),
                 cap_config.description.clone(),
                 cap_config.partition.clone(),
@@ -287,7 +287,7 @@ impl PolicyConfig {
 
         // Create principals and grant capabilities
         for (name, principal_config) in &self.principals {
-            let pid = acl.create_principal(name.clone())?;
+            let pid = acl.create_principal(PrincipalId::new(name.clone())?)?;
             for grant in &principal_config.grants {
                 acl.grant(&pid, grant)?;
             }
@@ -345,8 +345,8 @@ grants = ["read"]
         let mut acl = crate::AccessController::new(2, 4).unwrap();
         config.apply(&mut acl).unwrap();
 
-        let alice = PrincipalId::new("alice");
-        let bob = PrincipalId::new("bob");
+        let alice = PrincipalId::new("alice").expect("valid id");
+        let bob = PrincipalId::new("bob").expect("valid id");
 
         let alice_principal = acl.principal(&alice).unwrap();
         let bob_principal = acl.principal(&bob).unwrap();
