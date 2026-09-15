@@ -20,18 +20,18 @@
 //! # Example
 //!
 //! ```ignore
-//! use schubert::{AccessController, Capability, CapabilityKind, compose, are_composable};
+//! use schubert::{AccessController, Capability, CapabilityId, CapabilityKind, compose, are_composable};
 //!
 //! let mut acl = AccessController::new(2, 4)?;
 //! acl.register_capability(Capability::new(
-//!     "output:data", "Output", vec![1], CapabilityKind::ReadLike,
+//!     CapabilityId::new("output:data").expect("valid id"), "Output", vec![1], CapabilityKind::ReadLike,
 //! ))?;
 //! acl.register_capability(Capability::new(
-//!     "input:data", "Input", vec![1], CapabilityKind::ReadLike,
+//!     CapabilityId::new("input:data").expect("valid id"), "Input", vec![1], CapabilityKind::ReadLike,
 //! ))?;
 //!
-//! let producer = acl.create_principal("producer")?;
-//! let consumer = acl.create_principal("consumer")?;
+//! let producer = acl.create_principal(PrincipalId::new("producer").expect("valid id"))?;
+//! let consumer = acl.create_principal(PrincipalId::new("consumer").expect("valid id"))?;
 //! acl.grant(&producer, "output:data")?;
 //! acl.grant(&consumer, "input:data")?;
 //!
@@ -172,7 +172,7 @@ pub fn are_composable(
 mod tests {
     use super::*;
     use crate::capability::CapabilityKind;
-    use crate::Capability;
+    use crate::{Capability, CapabilityId};
 
     fn make_acl() -> AccessController {
         let mut acl = AccessController::new(2, 4).unwrap();
@@ -182,8 +182,13 @@ mod tests {
             ("keep_a", vec![1], CapabilityKind::ReadLike),
             ("keep_b", vec![1], CapabilityKind::ReadLike),
         ] {
-            acl.register_capability(Capability::new(id, id, partition, kind))
-                .unwrap();
+            acl.register_capability(Capability::new(
+                CapabilityId::new(id).expect("valid id"),
+                id,
+                partition,
+                kind,
+            ))
+            .unwrap();
         }
         acl
     }
@@ -191,8 +196,12 @@ mod tests {
     #[test]
     fn compose_two_principals() {
         let mut acl = make_acl();
-        let a = acl.create_principal("producer").unwrap();
-        let b = acl.create_principal("consumer").unwrap();
+        let a = acl
+            .create_principal(PrincipalId::new("producer").expect("valid id"))
+            .unwrap();
+        let b = acl
+            .create_principal(PrincipalId::new("consumer").expect("valid id"))
+            .unwrap();
         acl.grant(&a, "out").unwrap();
         acl.grant(&a, "keep_a").unwrap();
         acl.grant(&b, "in").unwrap();
@@ -207,16 +216,24 @@ mod tests {
     #[test]
     fn compose_without_interface_fails() {
         let mut acl = make_acl();
-        let a = acl.create_principal("a").unwrap();
-        let b = acl.create_principal("b").unwrap();
+        let a = acl
+            .create_principal(PrincipalId::new("a").expect("valid id"))
+            .unwrap();
+        let b = acl
+            .create_principal(PrincipalId::new("b").expect("valid id"))
+            .unwrap();
         assert!(compose(&acl, &a, "out", &b, "in").is_err());
     }
 
     #[test]
     fn are_composable_detects_compatibility() {
         let mut acl = make_acl();
-        let a = acl.create_principal("a").unwrap();
-        let b = acl.create_principal("b").unwrap();
+        let a = acl
+            .create_principal(PrincipalId::new("a").expect("valid id"))
+            .unwrap();
+        let b = acl
+            .create_principal(PrincipalId::new("b").expect("valid id"))
+            .unwrap();
         acl.grant(&a, "out").unwrap();
         acl.grant(&b, "in").unwrap();
         assert!(are_composable(&acl, &a, "out", &b, "in"));

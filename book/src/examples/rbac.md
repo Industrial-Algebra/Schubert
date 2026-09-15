@@ -17,24 +17,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
     acl.register_capability(Capability::new(
-        "read", "Read access", vec![1], CapabilityKind::ReadLike,
+        CapabilityId::new("read").expect("valid id"), "Read access", vec![1], CapabilityKind::ReadLike,
     ))?;
     acl.register_capability(Capability::new(
-        "write", "Write access", vec![2], CapabilityKind::WriteLike,
+        CapabilityId::new("write").expect("valid id"), "Write access", vec![2], CapabilityKind::WriteLike,
     ))?;
     acl.register_capability(Capability::new(
-        "admin", "Admin access", vec![2, 1], CapabilityKind::AdminLike,
+        CapabilityId::new("admin").expect("valid id"), "Admin access", vec![2, 1], CapabilityKind::AdminLike,
     ))?;
 ```
 
 ## Principals and Grants
 
 ```rust
-    let alice = acl.create_principal("alice")?;
+    let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?;
     acl.grant(&alice, "read")?;
     acl.grant(&alice, "write")?;
 
-    let bob = acl.create_principal("bob")?;
+    let bob = acl.create_principal(PrincipalId::new("bob").expect("valid id"))?;
     acl.grant(&bob, "read")?;
 ```
 

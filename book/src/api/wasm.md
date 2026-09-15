@@ -19,7 +19,7 @@ const acl = new WasmController(2, 4);
 acl.register_capability("read", [1], "ReadLike", "Read data");
 acl.register_capability("write", [2], "WriteLike", "Write data");
 
-const alice = acl.create_principal("alice");
+const alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"));
 acl.grant(alice, "read");
 acl.grant(alice, "write");
 

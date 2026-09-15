@@ -13,7 +13,7 @@ let mut mc = MultiController::new();
 let rbac = mc.add_domain_named(2, 4, "rbac")?;       // dim 4
 let tenant = mc.add_domain_named(3, 6, "multi-tenant")?; // dim 9
 
-let alice = mc.create_principal("alice", &rbac)?;
+let alice = mc.create_principal(PrincipalId::new("alice").expect("valid id"), &rbac)?;
 mc.grant_in_domain(&alice, "read", &rbac)?;
 mc.grant_in_domain(&alice, "write", &rbac)?;
 

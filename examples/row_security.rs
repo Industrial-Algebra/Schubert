@@ -6,42 +6,44 @@
 //! Models database row-level security with tenant isolation as
 //! Schubert conditions. Cross-tenant access is geometrically impossible.
 
-use schubert::{AccessController, AccessDecision, Capability, CapabilityKind};
+use schubert::{
+    AccessController, AccessDecision, Capability, CapabilityId, CapabilityKind, PrincipalId,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut acl = AccessController::new(2, 4)?;
 
     for tenant in &["tenant_a", "tenant_b", "tenant_c"] {
         acl.register_capability(Capability::new(
-            format!("read:{tenant}"),
+            CapabilityId::new(format!("read:{tenant}")).expect("valid id"),
             format!("Read {tenant}"),
             vec![1],
             CapabilityKind::ReadLike,
         ))?;
         acl.register_capability(Capability::new(
-            format!("write:{tenant}"),
+            CapabilityId::new(format!("write:{tenant}")).expect("valid id"),
             format!("Write {tenant}"),
             vec![2],
             CapabilityKind::WriteLike,
         ))?;
     }
     acl.register_capability(Capability::new(
-        "analytics:cross_tenant",
+        CapabilityId::new("analytics:cross_tenant").expect("valid id"),
         "Cross-tenant analytics",
         vec![2, 1],
         CapabilityKind::AdminLike,
     ))?;
 
-    let alice = acl.create_principal("alice")?;
+    let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?;
     acl.grant(&alice, "read:tenant_a")?;
     acl.grant(&alice, "write:tenant_a")?;
 
-    let bob = acl.create_principal("bob")?;
+    let bob = acl.create_principal(PrincipalId::new("bob").expect("valid id"))?;
     acl.grant(&bob, "read:tenant_a")?;
     acl.grant(&bob, "read:tenant_b")?;
     acl.grant(&bob, "write:tenant_b")?;
 
-    let analyst = acl.create_principal("analyst")?;
+    let analyst = acl.create_principal(PrincipalId::new("analyst").expect("valid id"))?;
     acl.grant(&analyst, "analytics:cross_tenant")?;
 
     println!("=== Multi-Tenant Row-Level Security ===\n");

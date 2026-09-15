@@ -15,7 +15,7 @@ let rbac_domain = mc.add_domain_named(2, 4, "rbac")?;
 let tenant_domain = mc.add_domain_named(3, 6, "multi-tenant")?;
 
 // Create principal in a domain
-let alice = mc.create_principal("alice", &rbac_domain)?;
+let alice = mc.create_principal(PrincipalId::new("alice").expect("valid id"), &rbac_domain)?;
 
 // Grant capabilities within a domain
 mc.grant_in_domain(&alice, "read", &rbac_domain)?;

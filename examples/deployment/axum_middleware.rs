@@ -14,7 +14,7 @@ use axum::{
     routing::get,
     Router,
 };
-use schubert::{AccessController, Capability, CapabilityKind};
+use schubert::{AccessController, Capability, CapabilityId, CapabilityKind, PrincipalId};
 use std::sync::Arc;
 
 /// In-memory shared access controller.
@@ -53,7 +53,7 @@ async fn schubert_auth(
     };
 
     // 4. Authorize via Schubert
-    let principal = schubert::PrincipalId::new(principal_id);
+    let principal = schubert::PrincipalId::new(principal_id).expect("valid id");
     match acl.check(&principal, required) {
         Ok(schubert::AccessDecision::Granted { .. }) => {
             next.run(req).await
@@ -76,16 +76,16 @@ async fn main() {
     // Initialize Schubert
     let mut acl = AccessController::new(2, 4).unwrap();
     acl.register_capability(Capability::new(
-        "read:data", "Read data", vec![1], CapabilityKind::ReadLike,
+        CapabilityId::new("read:data").expect("valid id"), "Read data", vec![1], CapabilityKind::ReadLike,
     )).unwrap();
     acl.register_capability(Capability::new(
-        "write:data", "Write data", vec![2], CapabilityKind::WriteLike,
+        CapabilityId::new("write:data").expect("valid id"), "Write data", vec![2], CapabilityKind::WriteLike,
     )).unwrap();
     acl.register_capability(Capability::new(
-        "admin", "Admin", vec![2, 1], CapabilityKind::AdminLike,
+        CapabilityId::new("admin").expect("valid id"), "Admin", vec![2, 1], CapabilityKind::AdminLike,
     )).unwrap();
 
-    let alice = acl.create_principal("alice").unwrap();
+    let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id")).unwrap();
     acl.grant(&alice, "read:data").unwrap();
     acl.grant(&alice, "write:data").unwrap();
 

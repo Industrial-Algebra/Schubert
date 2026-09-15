@@ -30,20 +30,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Register capabilities (Schubert conditions)
     acl.register_capability(Capability::new(
-        "read:data",
+        CapabilityId::new("read:data").expect("valid id"),
         "Read data access",
         vec![1],               // σ₁ — codimension 1
         CapabilityKind::ReadLike,
     ))?;
     acl.register_capability(Capability::new(
-        "write:data",
+        CapabilityId::new("write:data").expect("valid id"),
         "Write data access",
         vec![2],               // σ₂ — codimension 2
         CapabilityKind::WriteLike,
     ))?;
 
     // Create a principal and grant capabilities
-    let alice = acl.create_principal("alice")?;
+    let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?;
     acl.grant(&alice, "read:data")?;
     acl.grant(&alice, "write:data")?;
 

@@ -28,8 +28,8 @@ fn main() {
     let pk_bytes = issuer.public_key();
 
     // --- Single-capability token ---
-    let alice: PrincipalId = PrincipalId::new("alice");
-    let cap_read = CapabilityId::new("memory:read");
+    let alice: PrincipalId = PrincipalId::new("alice").expect("valid id");
+    let cap_read = CapabilityId::new("memory:read").expect("valid id");
     let token = issuer.issue(alice.clone(), cap_read.clone()).unwrap();
     let token_bytes = CapabilityToken::to_bytes(&token);
 
@@ -39,10 +39,13 @@ fn main() {
     // every issuance must be distinct — so deterministic vectors pin it.
     let grant = issuer
         .issue_grant_with_options(
-            "bob",
+            PrincipalId::new("bob").expect("valid id"),
             &[
-                (CapabilityId::new("memory:write"), vec![2]),
-                (CapabilityId::new("memory:read"), vec![1]),
+                (
+                    CapabilityId::new("memory:write").expect("valid id"),
+                    vec![2],
+                ),
+                (CapabilityId::new("memory:read").expect("valid id"), vec![1]),
             ],
             GrantOptions {
                 expires_at: None,
@@ -55,8 +58,8 @@ fn main() {
     // --- Expiry grant (#20.1) — signed expires_at + nonce, verified standalone ---
     let expiry_grant = issuer
         .issue_grant_with_options(
-            "erin",
-            &[(CapabilityId::new("memory:read"), vec![1])],
+            PrincipalId::new("erin").expect("valid id"),
+            &[(CapabilityId::new("memory:read").expect("valid id"), vec![1])],
             GrantOptions {
                 expires_at: Some(2_000_000_000),
                 nonce: [0x99; 16],
@@ -68,8 +71,8 @@ fn main() {
     // --- Tampered grant (extra capability added post-sign) — must FAIL verify ---
     let mut tampered = issuer
         .issue_grant_with_options(
-            "carol",
-            &[(CapabilityId::new("memory:read"), vec![1])],
+            PrincipalId::new("carol").expect("valid id"),
+            &[(CapabilityId::new("memory:read").expect("valid id"), vec![1])],
             GrantOptions {
                 expires_at: None,
                 nonce: [0x43; 16],
@@ -79,7 +82,7 @@ fn main() {
     tampered
         .capabilities
         .push(schubert::crypto::GrantCapability {
-            id: CapabilityId::new("memory:admin"),
+            id: CapabilityId::new("memory:admin").expect("valid id"),
             partition: vec![4, 4, 4, 4],
         });
     let tampered_bytes = GrantToken::to_bytes(&tampered);

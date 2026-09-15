@@ -31,12 +31,21 @@ use std::fmt;
 /// authentication system's subject identifiers.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct PrincipalId(pub String);
+pub struct PrincipalId(String);
 
 impl PrincipalId {
-    /// Create a new principal ID.
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
+    /// Create a validated principal identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::error::SchubertError::InvalidPrincipalId`] if `id`
+    /// is empty or contains a NUL byte.
+    pub fn new(id: impl Into<String>) -> crate::error::Result<Self> {
+        let id = id.into();
+        if id.is_empty() || id.contains('\0') {
+            return Err(crate::error::SchubertError::InvalidPrincipalId(id));
+        }
+        Ok(Self(id))
     }
     /// Return the inner string.
     pub fn as_str(&self) -> &str {
@@ -47,17 +56,6 @@ impl PrincipalId {
 impl fmt::Display for PrincipalId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-impl From<&str> for PrincipalId {
-    fn from(s: &str) -> Self {
-        Self(s.to_string())
-    }
-}
-impl From<String> for PrincipalId {
-    fn from(s: String) -> Self {
-        Self(s)
     }
 }
 
@@ -128,13 +126,12 @@ impl Principal {
     ///
     /// The principal starts with the identity position (empty partition —
     /// full access to the Grassmannian) and no granted capabilities.
-    pub fn new(id: impl Into<PrincipalId>, k: usize, n: usize) -> crate::error::Result<Self> {
-        let pid = id.into();
-        let namespace = NamespaceBuilder::new(pid.as_str(), k, n)
+    pub fn new(id: PrincipalId, k: usize, n: usize) -> crate::error::Result<Self> {
+        let namespace = NamespaceBuilder::new(id.as_str(), k, n)
             .build()
             .map_err(crate::error::SchubertError::Enumerative)?;
         Ok(Self {
-            id: pid,
+            id,
             namespace,
             granted_capability_ids: Vec::new(),
             created_at: now_millis(),
@@ -177,5 +174,35 @@ pub(crate) fn now_millis() -> u64 {
     #[cfg(any(not(feature = "std"), target_arch = "wasm32"))]
     {
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::SchubertError;
+
+    #[test]
+    fn principal_id_new_rejects_empty() {
+        assert!(PrincipalId::new("").is_err());
+        assert!(matches!(
+            PrincipalId::new(""),
+            Err(SchubertError::InvalidPrincipalId(_))
+        ));
+    }
+
+    #[test]
+    fn principal_id_new_rejects_interior_nul() {
+        assert!(PrincipalId::new("a\0b").is_err());
+        assert!(matches!(
+            PrincipalId::new("a\0b"),
+            Err(SchubertError::InvalidPrincipalId(_))
+        ));
+    }
+
+    #[test]
+    fn principal_id_new_accepts_valid() {
+        let p = PrincipalId::new("alice").expect("valid");
+        assert_eq!(p.as_str(), "alice");
     }
 }

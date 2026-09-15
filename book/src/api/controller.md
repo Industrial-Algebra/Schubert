@@ -14,7 +14,7 @@ let mut acl = AccessController::new(2, 4)?; // Gr(2,4)
 
 ```rust
 // Create a principal
-let alice = acl.create_principal("alice")?;
+let alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"))?;
 
 // Get an existing principal
 let bob = acl.get_principal("bob")?;
@@ -26,11 +26,11 @@ let principals = acl.principals();
 ## Capability Management
 
 ```rust
-use schubert::{Capability, CapabilityKind};
+use schubert::{Capability, CapabilityId, CapabilityKind};
 
 // Register a capability
 acl.register_capability(Capability::new(
-    "read:data",
+    CapabilityId::new("read:data").expect("valid id"),
     "Read data access",
     vec![1],
     CapabilityKind::ReadLike,

@@ -22,7 +22,7 @@
 //! acl.register_capability("write:data", "Write data", [2], "WriteLike");
 //!
 //! // Create a principal and grant capabilities
-//! const alice = acl.create_principal("alice");
+//! const alice = acl.create_principal(PrincipalId::new("alice").expect("valid id"));
 //! acl.grant(alice, "read:data");
 //! acl.grant(alice, "write:data");
 //!
@@ -79,13 +79,19 @@ impl WasmController {
             "AdminLike" => crate::CapabilityKind::AdminLike,
             _ => crate::CapabilityKind::Custom,
         };
-        let cap = crate::Capability::new(id, label, partition, kind);
+        let Ok(cid) = crate::CapabilityId::new(id) else {
+            return false;
+        };
+        let cap = crate::Capability::new(cid, label, partition, kind);
         self.inner.register_capability(cap).is_ok()
     }
 
     /// Create a principal and return its ID.
     pub fn create_principal(&mut self, id: &str) -> String {
-        match self.inner.create_principal(id) {
+        let Ok(pid) = crate::PrincipalId::new(id) else {
+            return String::new();
+        };
+        match self.inner.create_principal(pid) {
             Ok(pid) => pid.to_string(),
             Err(_) => String::new(),
         }
@@ -95,7 +101,9 @@ impl WasmController {
     ///
     /// Returns `true` if the grant succeeded.
     pub fn grant(&mut self, principal_id: &str, capability_id: &str) -> bool {
-        let pid = crate::PrincipalId::new(principal_id);
+        let Ok(pid) = crate::PrincipalId::new(principal_id) else {
+            return false;
+        };
         self.inner.grant(&pid, capability_id).is_ok()
     }
 
@@ -103,7 +111,9 @@ impl WasmController {
     ///
     /// Returns `true` if the revocation succeeded.
     pub fn revoke(&mut self, principal_id: &str, capability_id: &str) -> bool {
-        let pid = crate::PrincipalId::new(principal_id);
+        let Ok(pid) = crate::PrincipalId::new(principal_id) else {
+            return false;
+        };
         self.inner.revoke(&pid, capability_id).is_ok()
     }
 
@@ -116,7 +126,10 @@ impl WasmController {
     /// - `path`: computation path used
     /// - `conflicting`: conflicting capability IDs (if impossible)
     pub fn check(&self, principal_id: &str, required: Vec<String>) -> JsValue {
-        let pid = crate::PrincipalId::new(principal_id);
+        let pid = match crate::PrincipalId::new(principal_id) {
+            Ok(pid) => pid,
+            Err(e) => return JsValue::from(js_sys::Error::new(&e.to_string())),
+        };
         let req_refs: Vec<&str> = required.iter().map(|s| s.as_str()).collect();
 
         match self.inner.check(&pid, &req_refs) {
@@ -169,7 +182,9 @@ impl WasmController {
 
     /// Check whether a principal holds a specific capability.
     pub fn holds(&self, principal_id: &str, capability_id: &str) -> bool {
-        let pid = crate::PrincipalId::new(principal_id);
+        let Ok(pid) = crate::PrincipalId::new(principal_id) else {
+            return false;
+        };
         self.inner
             .principal(&pid)
             .is_some_and(|p| p.holds(capability_id))
@@ -177,7 +192,9 @@ impl WasmController {
 
     /// Get the capability count for a principal.
     pub fn capability_count(&self, principal_id: &str) -> usize {
-        let pid = crate::PrincipalId::new(principal_id);
+        let Ok(pid) = crate::PrincipalId::new(principal_id) else {
+            return 0;
+        };
         self.inner
             .principal(&pid)
             .map(|p| p.capability_count())
@@ -186,7 +203,9 @@ impl WasmController {
 
     /// Get the effective access dimension for a principal.
     pub fn effective_dimension(&self, principal_id: &str) -> i64 {
-        let pid = crate::PrincipalId::new(principal_id);
+        let Ok(pid) = crate::PrincipalId::new(principal_id) else {
+            return 0;
+        };
         self.inner.effective_dimension(&pid).unwrap_or(0) as i64
     }
 }

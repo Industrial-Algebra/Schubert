@@ -16,10 +16,11 @@
 //! ```
 //! # #[cfg(feature = "holographic")] {
 //! use schubert::holographic::HolographicAccessControl;
+//! use schubert::PrincipalId;
 //!
 //! let mut hac = HolographicAccessControl::new(2, 4)?;
 //! hac.register_capability("read", vec![1])?;
-//! hac.grant("alice", "read")?;
+//! hac.grant(PrincipalId::new("alice").expect("valid id"), "read")?;
 //!
 //! let result = hac.check_holo_access("alice", "read", 0.0)?;
 //! // Low threshold
@@ -107,17 +108,18 @@ impl HolographicAccessControl {
 
     /// Register a capability.
     pub fn register_capability(&mut self, id: &str, partition: Vec<usize>) -> Result<()> {
-        let cap = crate::Capability::new(id, id, partition, crate::CapabilityKind::Custom);
+        let cap = crate::Capability::new(
+            CapabilityId::new(id)?,
+            id,
+            partition,
+            crate::CapabilityKind::Custom,
+        );
         self.acl.register_capability(cap)
     }
 
     /// Grant a capability to a principal.
-    pub fn grant(
-        &mut self,
-        principal_id: impl Into<PrincipalId>,
-        capability_id: &str,
-    ) -> Result<()> {
-        let pid = principal_id.into();
+    pub fn grant(&mut self, principal_id: PrincipalId, capability_id: &str) -> Result<()> {
+        let pid = principal_id;
         let _ = self.acl.create_principal(pid.clone());
         self.acl.grant(&pid, capability_id)
     }
@@ -135,7 +137,7 @@ impl HolographicAccessControl {
         capability_id: &str,
         trust_threshold: f64,
     ) -> Result<HoloAccessResult> {
-        let pid = PrincipalId::new(principal_id);
+        let pid = PrincipalId::new(principal_id)?;
 
         // 1. Schubert check
         let decision = self.acl.check(&pid, &[capability_id])?;
@@ -174,7 +176,7 @@ impl HolographicAccessControl {
         principal_id: &str,
         trust_threshold: f64,
     ) -> Result<Vec<String>> {
-        let pid = PrincipalId::new(principal_id);
+        let pid = PrincipalId::new(principal_id)?;
         let principal = self
             .acl
             .principal(&pid)
@@ -247,7 +249,8 @@ mod tests {
     fn register_and_grant() {
         let mut hac = HolographicAccessControl::new(2, 4).unwrap();
         hac.register_capability("read", vec![1]).unwrap();
-        hac.grant("alice", "read").unwrap();
+        hac.grant(PrincipalId::new("alice").expect("valid id"), "read")
+            .unwrap();
     }
 
     #[test]
@@ -262,7 +265,8 @@ mod tests {
     fn holo_access_with_schubert_check() {
         let mut hac = HolographicAccessControl::new(2, 4).unwrap();
         hac.register_capability("read", vec![1]).unwrap();
-        hac.grant("alice", "read").unwrap();
+        hac.grant(PrincipalId::new("alice").expect("valid id"), "read")
+            .unwrap();
 
         let result = hac.check_holo_access("alice", "read", 0.0).unwrap();
         // Low threshold — granted by holo similarity, underconstrained by Schubert
@@ -273,7 +277,8 @@ mod tests {
     fn high_threshold_denies() {
         let mut hac = HolographicAccessControl::new(2, 4).unwrap();
         hac.register_capability("read", vec![1]).unwrap();
-        hac.grant("alice", "read").unwrap();
+        hac.grant(PrincipalId::new("alice").expect("valid id"), "read")
+            .unwrap();
 
         let result = hac.check_holo_access("alice", "read", 0.99).unwrap();
         // Very high threshold — similarity unlikely to exceed
@@ -287,8 +292,10 @@ mod tests {
         let mut hac = HolographicAccessControl::new(2, 4).unwrap();
         hac.register_capability("read", vec![1]).unwrap();
         hac.register_capability("write", vec![2]).unwrap();
-        hac.grant("alice", "read").unwrap();
-        hac.grant("alice", "write").unwrap();
+        hac.grant(PrincipalId::new("alice").expect("valid id"), "read")
+            .unwrap();
+        hac.grant(PrincipalId::new("alice").expect("valid id"), "write")
+            .unwrap();
 
         let caps = hac.accessible_at_trust("alice", 0.0).unwrap();
         assert_eq!(caps.len(), 2);

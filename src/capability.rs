@@ -37,12 +37,21 @@ use std::fmt;
 /// of partition, kind, or metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CapabilityId(pub String);
+pub struct CapabilityId(String);
 
 impl CapabilityId {
-    /// Create a new capability ID from a string.
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
+    /// Create a validated capability ID from a string.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SchubertError::InvalidCapabilityId`] if `id` is empty or
+    /// contains a NUL byte.
+    pub fn new(id: impl Into<String>) -> Result<Self> {
+        let id = id.into();
+        if id.is_empty() || id.contains('\0') {
+            return Err(SchubertError::InvalidCapabilityId(id));
+        }
+        Ok(Self(id))
     }
     /// Return the inner string reference.
     pub fn as_str(&self) -> &str {
@@ -53,17 +62,6 @@ impl CapabilityId {
 impl fmt::Display for CapabilityId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-impl From<&str> for CapabilityId {
-    fn from(s: &str) -> Self {
-        Self(s.to_string())
-    }
-}
-impl From<String> for CapabilityId {
-    fn from(s: String) -> Self {
-        Self(s)
     }
 }
 
@@ -95,10 +93,10 @@ pub enum CapabilityKind {
 /// # Example
 ///
 /// ```
-/// use schubert::{Capability, CapabilityKind};
+/// use schubert::{Capability, CapabilityId, CapabilityKind};
 ///
 /// let read = Capability::new(
-///     "read:data", "Read data", vec![1], CapabilityKind::ReadLike,
+///     CapabilityId::new("read:data").expect("valid id"), "Read data", vec![1], CapabilityKind::ReadLike,
 /// );
 /// assert_eq!(read.codimension(), 1);
 /// ```
@@ -129,13 +127,13 @@ pub struct Capability {
 impl Capability {
     /// Create a new capability with an empty description.
     pub fn new(
-        id: impl Into<CapabilityId>,
+        id: CapabilityId,
         label: impl Into<String>,
         partition: Vec<usize>,
         kind: CapabilityKind,
     ) -> Self {
         Self {
-            id: id.into(),
+            id,
             label: label.into(),
             description: String::new(),
             partition,
@@ -146,14 +144,14 @@ impl Capability {
 
     /// Create a new capability with a description.
     pub fn with_description(
-        id: impl Into<CapabilityId>,
+        id: CapabilityId,
         label: impl Into<String>,
         description: impl Into<String>,
         partition: Vec<usize>,
         kind: CapabilityKind,
     ) -> Self {
         Self {
-            id: id.into(),
+            id,
             label: label.into(),
             description: description.into(),
             partition,
@@ -216,5 +214,34 @@ impl Eq for Capability {}
 impl std::hash::Hash for Capability {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id.hash(state);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capability_id_new_rejects_empty() {
+        assert!(CapabilityId::new("").is_err());
+        assert!(matches!(
+            CapabilityId::new(""),
+            Err(SchubertError::InvalidCapabilityId(_))
+        ));
+    }
+
+    #[test]
+    fn capability_id_new_rejects_interior_nul() {
+        assert!(CapabilityId::new("a\0b").is_err());
+        assert!(matches!(
+            CapabilityId::new("a\0b"),
+            Err(SchubertError::InvalidCapabilityId(_))
+        ));
+    }
+
+    #[test]
+    fn capability_id_new_accepts_valid() {
+        let c = CapabilityId::new("read").expect("valid");
+        assert_eq!(c.as_str(), "read");
     }
 }

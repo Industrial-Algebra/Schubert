@@ -6,24 +6,24 @@ partition, a kind, and a label.
 ## Defining a Capability
 
 ```rust
-use schubert::{Capability, CapabilityKind};
+use schubert::{Capability, CapabilityId, CapabilityKind};
 
 let read = Capability::new(
-    "read:data",        // unique ID
+    CapabilityId::new("read:data").expect("valid id"),        // unique ID
     "Read data access", // human-readable label
     vec![1],            // partition: σ₁ (codimension 1)
     CapabilityKind::ReadLike,
 );
 
 let write = Capability::new(
-    "write:data",
+    CapabilityId::new("write:data").expect("valid id"),
     "Write data access",
     vec![2],             // partition: σ₂ (codimension 2)
     CapabilityKind::WriteLike,
 );
 
 let admin = Capability::new(
-    "admin",
+    CapabilityId::new("admin").expect("valid id"),
     "Full administrative access",
     vec![2, 2],          // partition: σ₂₂ (codimension 4, point class)
     CapabilityKind::AdminLike,
@@ -60,7 +60,7 @@ Partitions determine how capabilities interact. Key rules:
 Capabilities can have an expiry time:
 
 ```rust
-let temp = Capability::new("temp", "Temporary access", vec![1], CapabilityKind::ReadLike)
+let temp = Capability::new(CapabilityId::new("temp").expect("valid id"), "Temporary access", vec![1], CapabilityKind::ReadLike)
     .with_expiry(now + 3_600_000); // 1 hour from now
 
 acl.register_capability(temp)?;
