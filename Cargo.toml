@@ -92,6 +92,11 @@ required-features = ["crypto"]
 name = "wall_crossing_probe"
 path = "examples/wall_crossing_probe.rs"
 
+[[example]]
+name = "heterogeneous_walls_probe"
+path = "examples/heterogeneous_walls_probe.rs"
+required-features = ["crypto"]
+
 [[bench]]
 name = "computation_paths"
 harness = false
