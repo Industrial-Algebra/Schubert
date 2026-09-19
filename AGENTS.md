@@ -27,6 +27,10 @@ is `/skill:ia-gitflow`; the non-negotiables:
    backmerge; the divergence surfaced as a conflict at the v0.4.0 release PR.)*
 3. **Release-only commits** (dating the CHANGELOG, a final version touch) live on
    a `release/v*` branch so they're reviewed — never pushed to `develop`.
+4. **The operator merges every PR** — feature, release, backmerge alike.
+   Agents author, verify, and hand off; "proceed to publish" stops at the
+   merge handoff, it never authorizes the agent merging it
+   (ia-gitflow Rule 4, standing since 2026-09-16).
 
 Branch model: `feature/* → develop → release/v* → main → tag v* → publish.yml`.
 Trunk-based repos (ia-toolkit, docs) skip `develop`; Rules 1–3 still apply to
