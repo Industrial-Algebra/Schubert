@@ -454,7 +454,7 @@ interaction-aware engine is what would produce genuine non-additivity.
 
 **Expanded:** see
 [`docs/design/wall-crossing-diffusion-composition.md`](design/wall-crossing-diffusion-composition.md)
-— the v0.5.0 framing via diffusion-LM composition for Quantizon (BPS
+— the v0.5.0 framing via diffusion-LM composition for a private collaborator project (BPS
 non-additivity as a candidate formalism for emergence; tropical bridge). A
 KS-type composition probe (`analyze_composed_stability`) **landed in v0.5.0
 development** (PR #37, merged: computes `P_A`/`P_B`/`P_C` and tests additivity
